@@ -10,7 +10,7 @@ Spine-cpp uses C++11.
 
 ### Migrating from spine-c
 
-Please read the migration guide.
+Please read the [migration guide](https://github.com/Chobolabs/spine-cpp/blob/master/MigrationGuide.md).
 
 ### Integrating spine-cpp into a new project
 
@@ -30,7 +30,7 @@ No custom allocation options (yet), except for animation state track entries.
 * Uses a fork of [sajson](https://github.com/chadaustin/sajson) to load json files which provides much faster load time. The time spent in json parsing is about a half of spine-c's.
 * Utilizes more cache-friendly data structures which improve performance of the animation state update and world vertex generation. The observed gain is 2-3% on desktop cpus and 10-40% on common arm cpus found on most hand-held devices (due to their lower L1 and L2 cache miss tolerance)
 
-You can also see the upcoming features in the roadmap.
+You can also see the upcoming features in the [roadmap](https://github.com/Chobolabs/spine-cpp/blob/master/Roadmap.md).
 
 ## Other Q&A:
 
@@ -70,7 +70,7 @@ This is mainly for our own convenience because we often run spine-c and spine-cp
 
 ## Licensing
 
-This is a derivative work of the official spine-c library by Esoteric Software and, as such, is subject to the Spine Runtimes Software License. See LICENSE.txt for details
+This is a derivative work of the official spine-c library by Esoteric Software and, as such, is subject to the Spine Runtimes Software License. See [LICENSE.txt](https://github.com/Chobolabs/spine-cpp/blob/master/LICENSE.txt) for details
 
 This Spine Runtime may only be used for personal or internal use, typically to evaluate Spine before purchasing. If you would like to incorporate a Spine Runtime into your applications, distribute software containing a Spine Runtime, or modify a Spine Runtime, then you will need a valid [Spine license](https://esotericsoftware.com/spine-purchase).
 
