@@ -60,6 +60,9 @@ public:
       * @param alpha The amount of this animation that affects the current pose. */
     void mix(Skeleton& skeleton, float lastTime, float time, int loop, std::vector<const Event*>* outEvents, float alpha) const;
 
+    // Calls clearIdentityFrames for all timelines. See the comment in Timeline.h for more info.
+    void clearIdentityFramesFromTimelines();
+
     float duration = 0;
     std::vector<Timeline*> timelines;
 };

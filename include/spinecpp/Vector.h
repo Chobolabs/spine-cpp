@@ -105,4 +105,14 @@ inline Vector operator*(const Vector& a, const Vector& b)
     return Vector(a.x * b.x, a.y * b.y);
 }
 
+inline bool operator==(const Vector& a, const Vector& b)
+{
+    return a.x == b.x && a.y == b.y;
+}
+
+inline bool operator!=(const Vector& a, const Vector& b)
+{
+    return a.x != b.x || a.y != b.y;
+}
+
 }

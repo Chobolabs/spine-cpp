@@ -110,6 +110,15 @@ float CurveFrame::getCurvePercent(float percent) const
     return prev.y + (1 - prev.y) * (percent - prev.x) / (1 - prev.x); /* Last point is 1,1. */
 }
 
+bool CurveFrame::isSameCurveAs(const CurveFrame& other) const
+{
+    if (type != other.type) return false;
+
+    if (type != CurveFrame::Type::Bezier) return true;
+
+    return memcmp(bezierData, other.bezierData, BEZIER_DATA_SIZE * sizeof(Vector)) == 0;
+}
+
 CurveTimeline::CurveTimeline(int framesCount, Timeline::Type type)
     : Timeline(type)
 {
@@ -194,6 +203,20 @@ void RotateTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::
     bone.rotation += amount * alpha;
 }
 
+void RotateTimeline::clearIdentityFrames()
+{
+    float angle = frames.front().angle;    
+    for (size_t i = 1; i < frames.size(); ++i)
+    {
+        if (frames[i].angle != angle)
+        {
+            return;
+        }
+    }
+
+    frames.erase(frames.begin() + 1, frames.end());
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 TranslateTimeline::TranslateTimeline(int framesCount)
@@ -230,6 +253,21 @@ void TranslateTimeline::apply(Skeleton& skeleton, float lastTime, float time, st
         ) * alpha;
 }
 
+void TranslateTimeline::clearIdentityFrames()
+{
+    auto translation = frames.front().translation;
+    for (size_t i = 1; i < frames.size(); ++i)
+    {
+        if (frames[i].translation != translation)
+        {
+            return;
+        }
+    }
+
+    frames.erase(frames.begin() + 1, frames.end());
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////
 
 ScaleTimeline::ScaleTimeline(int framesCount)
@@ -264,6 +302,20 @@ void ScaleTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::v
         * (prevFrame->scale + (curFrame->scale - prevFrame->scale) * percent)
         - bone.scale
         ) * alpha;
+}
+
+void ScaleTimeline::clearIdentityFrames()
+{
+    auto scale = frames.front().scale;
+    for (size_t i = 1; i < frames.size(); ++i)
+    {
+        if (frames[i].scale != scale)
+        {
+            return;
+        }
+    }
+
+    frames.erase(frames.begin() + 1, frames.end());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -315,6 +367,21 @@ void ColorTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::v
         slot.color = color;
     }
 }
+
+void ColorTimeline::clearIdentityFrames()
+{
+    auto color = frames.front().color;
+    for (size_t i = 1; i < frames.size(); ++i)
+    {
+        if (frames[i].color != color)
+        {
+            return;
+        }
+    }
+
+    frames.erase(frames.begin() + 1, frames.end());
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -368,6 +435,20 @@ void AttachmentTimeline::apply(Skeleton& skeleton, float lastTime, float time, s
     slot.setAttachment(attachment);
 }
 
+void AttachmentTimeline::clearIdentityFrames()
+{
+    auto att = frames.front().attachmentName.c_str();;
+    for (size_t i = 1; i < frames.size(); ++i)
+    {
+        if (frames[i].attachmentName != att)
+        {
+            return;
+        }
+    }
+
+    frames.erase(frames.begin() + 1, frames.end());
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 EventTimeline::EventTimeline()
@@ -385,7 +466,7 @@ void EventTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::v
         apply(skeleton, lastTime, std::numeric_limits<float>::max(), firedEvents, alpha);
         lastTime = -1; // start from beginning
     }
-    else if (lastTime > frames.back().time)
+    else if (lastTime >= frames.back().time)
     {
         // Last time is after last frame.
         return;
@@ -419,6 +500,13 @@ void EventTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::v
         firedEvents->push_back(pFrame);
     }
 }
+
+void EventTimeline::clearIdentityFrames()
+{
+    // this is never identity
+    return;
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -473,6 +561,27 @@ void DrawOrderTimeline::apply(Skeleton& skeleton, float lastTime, float time, st
         skeleton.resetDrawOrder();
     }
 }
+
+void DrawOrderTimeline::clearIdentityFrames()
+{
+    auto order = frames.front().drawOrder;
+    for (size_t i = 1; i < frames.size(); ++i)
+    {
+        auto curOrder = frames[i].drawOrder;
+
+        if (order == curOrder) continue;
+
+        if (order == nullptr || curOrder == nullptr) return;
+
+        if (memcmp(curOrder, order, m_slotsCount * sizeof(int)))
+        {
+            return;
+        }
+    }
+
+    frames.erase(frames.begin() + 1, frames.end());
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -570,6 +679,26 @@ void FFDTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vec
     }
 }
 
+void FFDTimeline::clearIdentityFrames()
+{
+    auto verts = frames.front().vertices;
+    for (size_t i = 1; i < frames.size(); ++i)
+    {
+        auto curVerts = frames[i].vertices;
+
+        if (verts == curVerts) continue;
+
+        if (verts == nullptr || curVerts == nullptr) return;
+
+        if(memcmp(curVerts, verts, sizeof(Vector)*m_frameVerticesCount))
+        {
+            return;
+        }
+    }
+
+    frames.erase(frames.begin() + 1, frames.end());
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 IkConstraintTimeline::IkConstraintTimeline(int framesCount)
@@ -602,6 +731,21 @@ void IkConstraintTimeline::apply(Skeleton& skeleton, float lastTime, float time,
     float mix = prevFrame->mix + (curFrame->mix - prevFrame->mix) * percent;
     ikConstraint.mix += (mix - ikConstraint.mix) * alpha;
     ikConstraint.bendDirection = prevFrame->bendDirection;
+}
+
+void IkConstraintTimeline::clearIdentityFrames()
+{
+    auto mix = frames.front().mix;
+    // auto bd = frames.front().bendDirection;
+    for (size_t i = 1; i < frames.size(); ++i)
+    {
+        if (frames[i].mix != mix)
+        {
+            return;
+        }
+    }
+
+    frames.erase(frames.begin() + 1, frames.end());
 }
 
 

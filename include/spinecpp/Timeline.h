@@ -63,6 +63,12 @@ public:
 
     virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const = 0;
 
+    // Will clear all frames except the first if the transformations inside are identical.
+    // This may be unsafe if your code relies on changing individual frames of individual timelines.
+    // This however is probably rarely the case. If it is not, you can safely call this function to 
+    // get rid of frames left by mistake by the animators.
+    virtual void clearIdentityFrames() = 0;
+
 private:
     const Type type;
 };

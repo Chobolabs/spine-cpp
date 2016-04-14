@@ -72,4 +72,12 @@ void Animation::mix(Skeleton& skeleton, float lastTime, float time, int loop, st
     }
 }
 
+void Animation::clearIdentityFramesFromTimelines()
+{
+    for (auto t : timelines)
+    {
+        t->clearIdentityFrames();
+    }
+}
+
 }

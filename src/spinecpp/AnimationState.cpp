@@ -146,14 +146,7 @@ void AnimationState::apply(Skeleton& skeleton)
         auto previous = current->previous;
         if (!previous)
         {
-            if (current->mix == 1)
-            {
-                current->animation.apply(skeleton, current->lastTime, time, current->loop, &m_events);
-            }
-            else
-            {
-                current->animation.mix(skeleton, current->lastTime, time, current->loop, &m_events, current->mix);
-            }
+            current->animation.mix(skeleton, current->lastTime, time, current->loop, &m_events, current->mix);
         }
         else
         {

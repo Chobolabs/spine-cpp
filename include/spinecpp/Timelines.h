@@ -55,6 +55,8 @@ struct CurveFrame
 
     float getCurvePercent(float percent) const;
 
+    bool isSameCurveAs(const CurveFrame& other) const;
+
     enum class Type
     {
         Linear,
@@ -86,6 +88,8 @@ public:
 
     virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
 
+    virtual void clearIdentityFrames() override;
+
     struct Frame : public CurveFrame
     {
         float time;
@@ -102,6 +106,8 @@ public:
     TranslateTimeline(int framesCount);
 
     virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
+
+    virtual void clearIdentityFrames() override;
 
     struct Frame : public CurveFrame
     {
@@ -120,6 +126,8 @@ public:
 
     virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
 
+    virtual void clearIdentityFrames() override;
+
     struct Frame : public CurveFrame
     {
         float time;
@@ -137,6 +145,8 @@ public:
 
     virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
 
+    virtual void clearIdentityFrames() override;
+
     struct Frame : public CurveFrame
     {
         float time;
@@ -153,6 +163,8 @@ public:
     AttachmentTimeline();
 
     virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
+
+    virtual void clearIdentityFrames() override;
 
     struct Frame
     {
@@ -176,6 +188,8 @@ public:
 
     virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
 
+    virtual void clearIdentityFrames() override;
+
     typedef Event Frame;
     std::vector<Frame> frames;
 };
@@ -189,6 +203,8 @@ public:
     void setFrame(int frameIndex, float time, const std::vector<int>& drawOrder);
 
     virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
+
+    virtual void clearIdentityFrames() override;
 
     struct Frame
     {
@@ -213,6 +229,8 @@ public:
 
     virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
 
+    virtual void clearIdentityFrames() override;
+
     struct Frame : public CurveFrame
     {
         float time;
@@ -234,6 +252,8 @@ public:
     IkConstraintTimeline(int framesCount);
 
     virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
+
+    virtual void clearIdentityFrames() override;
 
     struct Frame : public CurveFrame
     {

@@ -65,17 +65,18 @@ struct TrackEntry
     TrackEntry* previous = nullptr;
     TrackEntry* next = nullptr;
     const Animation& animation;
-    bool loop = false;
+    int loop = false; // kept as int for alignment purposes
     float delay = 0;
     float time = 0;
     float lastTime = -1;
     float endTime = 0;
     float timeScale = 1;
-    AnimationStateListener listener;
+    
     float mixTime = 0;
     float mixDuration = 0;
     float mix = 1;
 
+    AnimationStateListener listener;
     void* rendererObject = nullptr;
 };
 
