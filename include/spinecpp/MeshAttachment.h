@@ -63,6 +63,11 @@ public:
     // Chobo: actually indices
     std::vector<int> triangles;
 
+    void setParentMesh(const MeshAttachment* parentMesh);
+    const MeshAttachment* getParentMesh() const { return m_parentMesh; }
+
+    bool inheritFFD = false;
+
     Color color = Color(1, 1, 1, 1);
 
     const void* rendererObject = nullptr;
@@ -77,6 +82,9 @@ public:
     // Nonessential.
     std::vector<int> edges;
     Vector size = Vector(0, 0);
+
+private:
+    const MeshAttachment* m_parentMesh = nullptr;
 };
 
 }

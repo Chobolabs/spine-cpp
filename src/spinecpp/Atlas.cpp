@@ -160,8 +160,8 @@ static char* mallocString(Str* str) {
     return string;
 }
 
-static const char* formatNames[] = { "Alpha", "Intensity", "LuminanceAlpha", "RGB565", "RGBA4444", "RGB888", "RGBA8888" };
-static const char* textureFilterNames[] = { "Nearest", "Linear", "MipMap", "MipMapNearestNearest", "MipMapLinearNearest",
+static const char* formatNames[] = { "", "Alpha", "Intensity", "LuminanceAlpha", "RGB565", "RGBA4444", "RGB888", "RGBA8888" };
+static const char* textureFilterNames[] = { "", "Nearest", "Linear", "MipMap", "MipMapNearestNearest", "MipMapLinearNearest",
 "MipMapNearestLinear", "MipMapLinearLinear" };
 
 }

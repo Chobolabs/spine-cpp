@@ -127,34 +127,90 @@ void Bone::updateWorldTransformWith(Vector translation, float rotation, Vector s
         c = pc * la + pd * lc;
         d = pc * lb + pd * ld;
     }
-    else if (data.inheritRotation) /* No scale inheritance. */
+    else 
     {
-        pa = 1;
-        pb = 0;
-        pc = 0;
-        pd = 1;
-
-        auto p = parent;
-
-        do
+        if (data.inheritRotation) /* No scale inheritance. */
         {
-            cosine = cos(p->appliedRotation * DEG_RAD);
-            sine = sin(p->appliedRotation * DEG_RAD);
-            float temp = pa * cosine + pb * sine;
-            pb = pa * -sine + pb * cosine;
-            pa = temp;
-            temp = pc * cosine + pd * sine;
-            pd = pc * -sine + pd * cosine;
-            pc = temp;
+            pa = 1;
+            pb = 0;
+            pc = 0;
+            pd = 1;
 
-            if (!p->data.inheritRotation) break;
-            p = p->parent;
-        } while (p);
+            auto p = parent;
 
-        a = pa * la + pb * lc;
-        b = pa * lb + pb * ld;
-        c = pc * la + pd * lc;
-        d = pc * lb + pd * ld;
+            do
+            {
+                cosine = cos(p->appliedRotation * DEG_RAD);
+                sine = sin(p->appliedRotation * DEG_RAD);
+                float temp = pa * cosine + pb * sine;
+                pb = pa * -sine + pb * cosine;
+                pa = temp;
+                temp = pc * cosine + pd * sine;
+                pd = pc * -sine + pd * cosine;
+                pc = temp;
+
+                if (!p->data.inheritRotation) break;
+                p = p->parent;
+            } while (p);
+
+            a = pa * la + pb * lc;
+            b = pa * lb + pb * ld;
+            c = pc * la + pd * lc;
+            d = pc * lb + pd * ld;
+        }
+        else if (data.inheritScale) /* No rotation inheritance. */
+        {
+            pa = 1;
+            pb = 0;
+            pc = 0;
+            pd = 1;
+
+            auto p = parent;
+
+            do {
+                float za, zb, zc, zd;
+                float r = p->rotation;
+                float psx = p->appliedScale.x, psy = appliedScale.y;
+                cosine = cos(r * DEG_RAD);
+                sine = sin(r * DEG_RAD);
+                za = cosine * psx;
+                zb = -sine * psy;
+                zc = sine * psx;
+                zd = cosine * psy;
+                float temp = pa * za + pb * zc;
+                pb = pa * zb + pb * zd;
+                pa = temp;
+                temp = pc * za + pd * zc;
+                pd = pc * zb + pd * zd;
+                pc = temp;
+
+                if (psx < 0) r = -r;
+                cosine = cos(-r * DEG_RAD);
+                sine = sin(-r * DEG_RAD);
+                temp = pa * cosine + pb * sine;
+                pb = pa * -sine + pb * cosine;
+                pa = temp;
+                temp = pc * cosine + pd * sine;
+                pd = pc * -sine + pd * cosine;
+                pc = temp;
+
+                if (!p->data.inheritScale) break;
+                p = p->parent;
+            } while (p);
+
+
+            a = pa * la + pb * lc;
+            b = pa * lb + pb * ld;
+            c = pc * la + pd * lc;
+            d = pc * lb + pd * ld;
+        }
+        else
+        {
+            a = la;
+            b = lb;
+            c = lc;
+            d = ld;
+        }
 
         if (skeleton.flipX)
         {
@@ -167,70 +223,6 @@ void Bone::updateWorldTransformWith(Vector translation, float rotation, Vector s
             c = -c;
             d = -d;
         }
-    }
-    else if (data.inheritRotation) /* No rotation inheritance. */
-    {
-        pa = 1;
-        pb = 0;
-        pc = 0;
-        pd = 1;
-
-        auto p = parent;
-
-        do {
-            float za, zb, zc, zd;
-            float r = p->rotation;
-            float psx = p->appliedScale.x, psy = appliedScale.y;
-            cosine = cos(r * DEG_RAD);
-            sine = sin(r * DEG_RAD);
-            za = cosine * psx;
-            zb = -sine * psy;
-            zc = sine * psx;
-            zd = cosine * psy;
-            float temp = pa * za + pb * zc;
-            pb = pa * zb + pb * zd;
-            pa = temp;
-            temp = pc * za + pd * zc;
-            pd = pc * zb + pd * zd;
-            pc = temp;
-
-            if (psx < 0) r = -r;
-            cosine = cos(-r * DEG_RAD);
-            sine = sin(-r * DEG_RAD);
-            temp = pa * cosine + pb * sine;
-            pb = pa * -sine + pb * cosine;
-            pa = temp;
-            temp = pc * cosine + pd * sine;
-            pd = pc * -sine + pd * cosine;
-            pc = temp;
-
-            if (!p->data.inheritScale) break;
-            p = p->parent;
-        } while (p);
-
-
-        a = pa * la + pb * lc;
-        b = pa * lb + pb * ld;
-        c = pc * la + pd * lc;
-        d = pc * lb + pd * ld;
-
-        if (skeleton.flipX)
-        {
-            a = -a;
-            b = -b;
-        }
-
-        if (skeleton.flipY != m_isYDown)
-        {
-            c = -c;
-            d = -d;
-        }
-    }
-    else {
-        a = la;
-        b = lb;
-        c = lc;
-        d = ld;
     }
 }
 

@@ -77,61 +77,62 @@ void IkConstraint::apply1(Bone& bone, Vector target, float alpha)
         rotationIK = 360 - rotationIK;
     if (rotationIK > 180) rotationIK -= 360;
     else if (rotationIK < -180) rotationIK += 360;
-    bone.updateWorldTransformWith(bone.translation, rotation + (rotationIK - rotation) * alpha, bone.scale);
+    bone.updateWorldTransformWith(bone.translation, rotation + (rotationIK - rotation) * alpha, bone.appliedScale);
 }
 
 void IkConstraint::apply2(Bone& parent, Bone& child, Vector target, int bendDir, float alpha)
 {
-    float px = parent.translation.x, py = parent.translation.y;
-    float psx = parent.scale.x, psy = parent.scale.y;
-    float csx = child.scale.x;
-    float cy = child.translation.x;
-
-    int offset1, offset2, sign2;
-    auto pp = parent.parent;
-    float tx, ty, dx, dy, l1, l2, a1, a2, psd, r;
+    float px = parent.translation.x, py = parent.translation.y, psx = parent.appliedScale.x, psy = parent.appliedScale.y;
+    float cx = child.translation.x, cy = child.translation.y, csx = child.appliedScale.x, cwx = child.worldPos.x, cwy = child.worldPos.y;
+    int o1, o2, s2, u;
+    const Bone* pp = parent.parent;
+    float tx, ty, dx, dy, l1, l2, a1, a2, r;
     if (alpha == 0) return;
     if (psx < 0) {
         psx = -psx;
-        offset1 = 180;
-        sign2 = -1;
+        o1 = 180;
+        s2 = -1;
     }
     else {
-        offset1 = 0;
-        sign2 = 1;
+        o1 = 0;
+        s2 = 1;
     }
     if (psy < 0) {
         psy = -psy;
-        sign2 = -sign2;
+        s2 = -s2;
+    }
+    r = psx - psy;
+    u = (r < 0 ? -r : r) <= 0.0001f;
+    if (!u && cy != 0) {
+        cwx = parent.a * cx + parent.worldPos.x;
+        cwy = parent.c * cx + parent.worldPos.y;
+        cy = 0;
     }
     if (csx < 0) {
         csx = -csx;
-        offset2 = 180;
+        o2 = 180;
     }
     else
-        offset2 = 0;
+        o2 = 0;
     if (!pp) {
         tx = target.x - px;
         ty = target.y - py;
-        dx = child.worldPos.x - px;
-        dy = child.worldPos.y - py;
+        dx = cwx - px;
+        dy = cwy - py;
     }
     else {
-        float a = pp->a, b = pp->b, c = pp->c, d = pp->d;
-        float invDet = 1 / (a * d - b * c);
-        float wx = pp->worldPos.x, wy = pp->worldPos.y;
-        float x = target.x - wx, y = target.y - wy;
+        float a = pp->a, b = pp->b, c = pp->c, d = pp->d, invDet = 1 / (a * d - b * c);
+        float wx = pp->worldPos.x, wy = pp->worldPos.y, x = target.x - wx, y = target.y - wy;
         tx = (x * d - y * b) * invDet - px;
         ty = (y * a - x * c) * invDet - py;
-        x = child.worldPos.x - wx;
-        y = child.worldPos.y - wy;
+        x = cwx - wx;
+        y = cwy - wy;
         dx = (x * d - y * b) * invDet - px;
         dy = (y * a - x * c) * invDet - py;
     }
     l1 = sqrt(dx * dx + dy * dy);
     l2 = child.data.length * csx;
-    psd = psx - psy;
-    if (psd < 0 ? -psd : psd <= 0.0001f) {
+    if (u) {
         float cos, a, o;
         l2 *= psx;
         cos = (tx * tx + ty * ty - l1 * l1 - l2 * l2) / (2 * l1 * l2);
@@ -147,10 +148,9 @@ void IkConstraint::apply2(Bone& parent, Bone& child, Vector target, int bendDir,
         float aa = a * a, bb = b * b, ll = l1 * l1, dd = tx * tx + ty * ty;
         float c0 = bb * ll + aa * dd - aa * bb, c1 = -2 * bb * l1, c2 = bb - aa;
         float d = c1 * c1 - 4 * c2 * c0;
-        float minAngle = 0, minDist = std::numeric_limits<float>::max(), minX = 0, minY = 0;
+        float minAngle = 0, minDist = FLT_MAX, minX = 0, minY = 0;
         float maxAngle = 0, maxDist = 0, maxX = 0, maxY = 0;
         float x = l1 + a, dist = x * x, angle, y;
-        cy = 0;
         if (d >= 0) {
             float q = sqrt(d), r0, r1, ar0, ar1;;
             if (c1 < 0) q = -q;
@@ -204,20 +204,19 @@ void IkConstraint::apply2(Bone& parent, Bone& child, Vector target, int bendDir,
             a2 = maxAngle * bendDir;
         }
     }
-outer: {
-    float offset = atan2(cy, child.translation.x) * sign2;
-    a1 = (a1 - offset) * RAD_DEG + offset1;
-    a2 = (a2 + offset) * RAD_DEG * sign2 + offset2;
-    if (a1 > 180) a1 -= 360;
-    else if (a1 < -180) a1 += 360;
-    if (a2 > 180) a2 -= 360;
-    else if (a2 < -180) a2 += 360;
-    r = parent.rotation;
-    parent.updateWorldTransformWith(parent.translation, r + (a1 - r) * alpha, parent.scale);
-    r = child.rotation;
-    child.updateWorldTransformWith(Vector(child.translation.x, cy), r + (a2 - r) * alpha, child.scale);
-}
-
+    outer: {
+        float os = atan2(cy, cx) * s2;
+        a1 = (a1 - os) * RAD_DEG + o1;
+        a2 = (a2 + os) * RAD_DEG * s2 + o2;
+        if (a1 > 180) a1 -= 360;
+        else if (a1 < -180) a1 += 360;
+        if (a2 > 180) a2 -= 360;
+        else if (a2 < -180) a2 += 360;
+        r = parent.rotation;
+        parent.updateWorldTransformWith(Vector(px, py), r + (a1 - r) * alpha, parent.appliedScale);
+        r = child.rotation;
+        child.updateWorldTransformWith(Vector(cx, cy), r + (a2 - r) * alpha, child.appliedScale);
+    }
 }
 
 }

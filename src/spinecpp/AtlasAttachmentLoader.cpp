@@ -70,7 +70,9 @@ Attachment* AtlasAttachmentLoader::createAttachmentImpl(const Skin& skin, Attach
 
         return attachment;
     }
-    case Attachment::Type::Mesh: {
+    case Attachment::Type::Mesh:
+    case Attachment::Type::LinkedMesh:
+    {
         auto region = m_atlas.findRegion(path);
 
         if (!region)
@@ -94,7 +96,9 @@ Attachment* AtlasAttachmentLoader::createAttachmentImpl(const Skin& skin, Attach
         attachment->regionOriginalHeight = region->originalHeight;
         return attachment;
     }
-    case Attachment::Type::WeightedMesh: {
+    case Attachment::Type::WeightedMesh:
+    case Attachment::Type::WeightedLinkedMesh:
+    {
         auto region = m_atlas.findRegion(path);
 
         if (!region)

@@ -47,6 +47,8 @@ public:
         BoundingBox,
         Mesh,
         WeightedMesh,
+        LinkedMesh,
+        WeightedLinkedMesh,
     };
 
     Attachment(const std::string& name, const Type type)

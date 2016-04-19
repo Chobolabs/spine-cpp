@@ -35,6 +35,9 @@
 #include <spinecpp/Bone.h>
 #include <spinecpp/Slot.h>
 #include <spinecpp/Event.h>
+#include <spinecpp/Attachment.h>
+#include <spinecpp/MeshAttachment.h>
+#include <spinecpp/WeightedMeshAttachment.h>
 
 #include <algorithm>
 
@@ -619,7 +622,28 @@ void FFDTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vec
     if (time < frames.front().time) return; // time is before first frame
 
     auto& slot = skeleton.slots[slotIndex];
-    if (slot.getAttachment() != attachment) return; // attachmend is changed, so nothing can be done
+    if (slot.getAttachment() != attachment)
+    {
+        // attachments don't match, so try parent attachments
+        if (!slot.getAttachment()) return;
+        switch (slot.getAttachment()->type)
+        {
+        case Attachment::Type::Mesh:
+        {
+            auto mesh = static_cast<const MeshAttachment*>(slot.getAttachment());
+            if (!mesh->inheritFFD || mesh->getParentMesh() != attachment) return;
+            break;
+        }
+        case Attachment::Type::WeightedMesh:
+        {
+            auto mesh = static_cast<const WeightedMeshAttachment*>(slot.getAttachment());
+            if (!mesh->inheritFFD || mesh->getParentMesh() != attachment) return;
+            break;
+        }
+        default:
+            return;
+        }
+    }
 
     if (slot.attachmentVertices.size() != m_frameVerticesCount)
     {

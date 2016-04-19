@@ -62,6 +62,11 @@ public:
     std::vector<Vector> uvs;
     int hullLength = 0;
 
+    void setParentMesh(const WeightedMeshAttachment* parentMesh);
+    const WeightedMeshAttachment* getParentMesh() const { return m_parentMesh; }
+
+    bool inheritFFD = false;
+
     Color color = Color(1, 1, 1, 1);
 
     const void* rendererObject = nullptr;
@@ -76,6 +81,9 @@ public:
     // Nonessential.
     std::vector<int> edges;
     Vector size = Vector(0, 0);
+
+private:
+    const WeightedMeshAttachment* m_parentMesh = nullptr;
 };
 
 }
