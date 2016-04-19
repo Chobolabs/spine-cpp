@@ -18,7 +18,7 @@ Please read the [migration guide](https://github.com/Chobolabs/spine-cpp/blob/ma
 
 ## Limitations
 
-Like the spine-c runtime linked meshes and binary loading are not yet supported.
+Like the spine-c runtime binary loading is not yet supported.
 
 There may be bugs not present in spine-c (mainly in code paths not utilized by our software). Issue reports or pull requests for such would be welcome.
 
@@ -29,6 +29,7 @@ No custom allocation options (yet), except for animation state track entries.
 * Written in C++11 with virtual functions instead of spine-c's C-style polymorphism (Unfortunately it also means slower compile-time)
 * Uses a fork of [sajson](https://github.com/chadaustin/sajson) to load json files which provides much faster load time. The time spent in json parsing is about a half of spine-c's.
 * Utilizes more cache-friendly data structures which improve performance of the animation state update and world vertex generation. The observed gain is 2-3% on desktop cpus and 10-40% on common arm cpus found on most hand-held devices (due to their lower L1 and L2 cache miss tolerance)
+* No support for linked meshes yet, but it will be available soon
 
 You can also see the upcoming features in the [roadmap](https://github.com/Chobolabs/spine-cpp/blob/master/Roadmap.md).
 
@@ -62,7 +63,7 @@ Plus it's much more convenient to write `bone.rotation += x;` instead of `bone.s
 
 The idea behind the differentiation was that types that can be constructed on their own, without depending on other types of the library are `struct`. Those are mainly the `data` types.
 
-We too are not entirely satisfied with the current differentiation and it is subject to change. 
+We too are not entirely satisfied with the current differentiation and it is subject to change.
 
 **Why did you choose the include path `spinecpp` instead of just `spine`?**
 
