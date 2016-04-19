@@ -148,7 +148,7 @@ void IkConstraint::apply2(Bone& parent, Bone& child, Vector target, int bendDir,
         float aa = a * a, bb = b * b, ll = l1 * l1, dd = tx * tx + ty * ty;
         float c0 = bb * ll + aa * dd - aa * bb, c1 = -2 * bb * l1, c2 = bb - aa;
         float d = c1 * c1 - 4 * c2 * c0;
-        float minAngle = 0, minDist = FLT_MAX, minX = 0, minY = 0;
+        float minAngle = 0, minDist = std::numeric_limits<float>::max(), minX = 0, minY = 0;
         float maxAngle = 0, maxDist = 0, maxX = 0, maxY = 0;
         float x = l1 + a, dist = x * x, angle, y;
         if (d >= 0) {
