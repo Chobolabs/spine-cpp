@@ -569,7 +569,11 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
                         }
                     }
                     break;
+                    case Attachment::Type::LinkedMesh:
+                    case Attachment::Type::WeightedLinkedMesh:
+                    break;
                     }
+                    
 
                     m_loader->configureAttachment(attachment);
                     skin.m_entries.emplace_back(slotIndex, skinAttachmentName, attachment);
