@@ -77,7 +77,7 @@ Attachment* AtlasAttachmentLoader::createAttachmentImpl(const Skin& skin, Attach
 
         if (!region)
         {
-            setError("Mesh not found: ", path);
+            setError("Region for mesh not found: ", path);
             return nullptr;
         }
 
@@ -103,7 +103,7 @@ Attachment* AtlasAttachmentLoader::createAttachmentImpl(const Skin& skin, Attach
 
         if (!region)
         {
-            setError("Weighted mesh not found: ", path);
+            setError("Region for weighted mesh not found: ", path);
             return nullptr;
         }
 
