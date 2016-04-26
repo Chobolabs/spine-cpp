@@ -55,10 +55,10 @@ void MeshAttachment::updateUVs()
         for (size_t i = 0; i < uvs.size(); ++i)
         {
             auto& uv = uvs[i];
-            const auto& regionUV = regionUVs[i];
+            const auto& ruv = regionUVs[i];
 
-            uv.x = regionUV.x + regionUV.y * size.x;
-            uv.y = regionUV.y + size.y - regionUV.x * size.y;
+            uv.x = regionUV.x + ruv.y * size.x;
+            uv.y = regionUV.y + size.y - ruv.x * size.y;
         }
     }
     else
@@ -66,10 +66,10 @@ void MeshAttachment::updateUVs()
         for (size_t i = 0; i < uvs.size(); ++i)
         {
             auto& uv = uvs[i];
-            const auto& regionUV = regionUVs[i];
+            const auto& ruv = regionUVs[i];
 
-            uv.x = regionUV.x + regionUV.x * size.x;
-            uv.y = regionUV.y + regionUV.y * size.y;
+            uv.x = regionUV.x + ruv.x * size.x;
+            uv.y = regionUV.y + ruv.y * size.y;
         }
     }
 }
