@@ -33,6 +33,7 @@
 #include <spinecpp/AnimationState.h>
 
 #include <cassert>
+#include <cstring>
 
 namespace spine
 {
