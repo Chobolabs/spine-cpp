@@ -50,8 +50,8 @@ namespace spine
 {
 
 SkeletonJson::SkeletonJson(AttachmentLoader& loader)
-    : m_loader(&loader)
-    , m_ownsLoader(false)
+    : m_ownsLoader(false)
+    , m_loader(&loader)
 {
 }
 
