@@ -227,6 +227,8 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
 
             // other
             ik.bendDirection = jik.get_safe_integer_value_of_key(literal("bendPositive"), 1);
+            if (!ik.bendDirection) ik.bendDirection = -1;
+
             ik.mix = jik.get_safe_float_value_of_key(literal("mix"), 1);
         }
     }
