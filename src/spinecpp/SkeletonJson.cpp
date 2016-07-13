@@ -135,7 +135,7 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
         skeletonData->hash = jskeleton.get_value_of_key(literal("hash")).get_string_value();
         skeletonData->version = jskeleton.get_value_of_key(literal("spine")).get_string_value();
         skeletonData->size.x = jskeleton.get_value_of_key(literal("width")).get_safe_float_value();
-        skeletonData->size.y = jskeleton.get_value_of_key(literal("width")).get_safe_float_value();
+        skeletonData->size.y = jskeleton.get_value_of_key(literal("height")).get_safe_float_value();
     }
 
     {
@@ -172,6 +172,8 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
             bone.rotation = jbone.get_safe_float_value_of_key(literal("rotation"));
             bone.scale.x = jbone.get_safe_float_value_of_key(literal("scaleX"), 1);
             bone.scale.y = jbone.get_safe_float_value_of_key(literal("scaleY"), 1);
+            bone.shear.x = jbone.get_safe_float_value_of_key(literal("shearY"));
+            bone.shear.y = jbone.get_safe_float_value_of_key(literal("shearY"));
             bone.inheritScale = !!jbone.get_safe_integer_value_of_key(literal("inheritScale"), 1);
             bone.inheritRotation = !!jbone.get_safe_integer_value_of_key(literal("inheritRotation"), 1);
             // no color...
@@ -272,9 +274,16 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
             transform.target = targetBone;
 
             // other
+            transform.offsetRotation = jtransform.get_safe_float_value_of_key(literal("rotation"));
+            transform.offsetTranslation.x = jtransform.get_safe_float_value_of_key(literal("x")) * m_scale;
+            transform.offsetTranslation.x = jtransform.get_safe_float_value_of_key(literal("y")) * m_scale;
+            transform.offsetScale.x = jtransform.get_safe_float_value_of_key(literal("scaleX")) * m_scale;
+            transform.offsetScale.y = jtransform.get_safe_float_value_of_key(literal("scaleY")) * m_scale;
+            transform.offsetShearY = jtransform.get_safe_float_value_of_key(literal("shearY")) * m_scale;
+            transform.rotateMix = jtransform.get_safe_float_value_of_key(literal("rotateMix"), 1);
             transform.translateMix = jtransform.get_safe_float_value_of_key(literal("translateMix"), 1);
-            transform.translation.x = jtransform.get_safe_float_value_of_key(literal("x")) * m_scale;
-            transform.translation.y = jtransform.get_safe_float_value_of_key(literal("y")) * m_scale;
+            transform.scaleMix = jtransform.get_safe_float_value_of_key(literal("scaleMix"), 1);
+            transform.shearMix = jtransform.get_safe_float_value_of_key(literal("shearMix"), 1);
         }
     }
 
@@ -381,6 +390,14 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
                     {
                         type = Attachment::Type::WeightedMesh;
                     }
+                    else if (strcmp(stype, "linkedmesh") == 0)
+                    {
+                        type = Attachment::Type::LinkedMesh;
+                    }
+                    else if (strcmp(stype, "weightedlinkedmesh") == 0)
+                    {
+                        type = Attachment::Type::WeightedLinkedMesh;
+                    }
                     else if (strcmp(stype, "boundingbox") == 0)
                     {
                         type = Attachment::Type::BoundingBox;
@@ -420,139 +437,173 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
                         region->color = Color_fromHexString(color);
 
                         region->updateOffset();
+
+                        m_loader->configureAttachment(region);
                     }
                     break;
                     case Attachment::Type::Mesh:
+                    case Attachment::Type::LinkedMesh:
                     {
                         auto mesh = static_cast<MeshAttachment*>(attachment);
 
-                        const auto& jvertices = jattachment.get_value_of_key(literal("vertices"));
-                        auto numVertices = jvertices.get_length();
-                        mesh->vertices.reserve(numVertices);
-                        for (size_t v = 0; v < numVertices; v += 2)
-                        {
-                            float x = jvertices.get_array_element(v).get_safe_float_value() * m_scale;
-                            float y = jvertices.get_array_element(v + 1).get_safe_float_value() * m_scale;
-
-                            mesh->vertices.emplace_back(x, y);
-                        }
-
-                        const auto& jtriangles = jattachment.get_value_of_key(literal("triangles"));
-                        auto numTriangles = jtriangles.get_length();
-                        mesh->triangles.resize(numTriangles);
-                        for (size_t t = 0; t < numTriangles; ++t)
-                        {
-                            mesh->triangles[t] = jtriangles.get_array_element(t).get_integer_value();
-                        }
-
-                        const auto& juvs = jattachment.get_value_of_key(literal("uvs"));
-                        auto numUVs = juvs.get_length();
-                        mesh->regionUVs.reserve(numUVs);
-                        for (size_t uv = 0; uv < numUVs; uv += 2)
-                        {
-                            float x = juvs.get_array_element(uv).get_safe_float_value();
-                            float y = juvs.get_array_element(uv + 1).get_safe_float_value();
-
-                            mesh->regionUVs.emplace_back(x, y);
-                        }
-
-                        mesh->updateUVs();
-
                         string color = jattachment.get_safe_value_of_key_as_string(literal("color"));
                         mesh->color = Color_fromHexString(color);
 
-                        mesh->hullLength = jattachment.get_safe_integer_value_of_key(literal("hull"));
-
-                        auto iedges = jattachment.find_object_key(literal("edges"));
-                        if (iedges < jattachment.get_length())
-                        {
-                            const auto& jedges = jattachment.get_object_value(iedges);
-                            mesh->edges.resize(jedges.get_length());
-                            for (size_t e = 0; e < mesh->edges.size(); ++e)
-                            {
-                                mesh->edges[e] = jedges.get_array_element(e).get_integer_value();
-                            }
-                        }
-
                         mesh->size.x = jattachment.get_safe_float_value_of_key(literal("width"), 32) * m_scale;
                         mesh->size.y = jattachment.get_safe_float_value_of_key(literal("height"), 32) * m_scale;
+
+                        auto iparent = jattachment.find_object_key(literal("parent"));
+                        if (iparent == jattachment.get_length())
+                        {
+                            const auto& jvertices = jattachment.get_value_of_key(literal("vertices"));
+                            auto numVertices = jvertices.get_length();
+                            mesh->vertices.reserve(numVertices);
+                            for (size_t v = 0; v < numVertices; v += 2)
+                            {
+                                float x = jvertices.get_array_element(v).get_safe_float_value() * m_scale;
+                                float y = jvertices.get_array_element(v + 1).get_safe_float_value() * m_scale;
+
+                                mesh->vertices.emplace_back(x, y);
+                            }
+
+                            const auto& jtriangles = jattachment.get_value_of_key(literal("triangles"));
+                            auto numTriangles = jtriangles.get_length();
+                            mesh->triangles.resize(numTriangles);
+                            for (size_t t = 0; t < numTriangles; ++t)
+                            {
+                                mesh->triangles[t] = jtriangles.get_array_element(t).get_integer_value();
+                            }
+
+                            const auto& juvs = jattachment.get_value_of_key(literal("uvs"));
+                            auto numUVs = juvs.get_length();
+                            mesh->regionUVs.reserve(numUVs);
+                            for (size_t uv = 0; uv < numUVs; uv += 2)
+                            {
+                                float x = juvs.get_array_element(uv).get_safe_float_value();
+                                float y = juvs.get_array_element(uv + 1).get_safe_float_value();
+
+                                mesh->regionUVs.emplace_back(x, y);
+                            }
+
+                            mesh->updateUVs();
+
+                            mesh->hullLength = jattachment.get_safe_integer_value_of_key(literal("hull"));
+
+                            auto iedges = jattachment.find_object_key(literal("edges"));
+                            if (iedges < jattachment.get_length())
+                            {
+                                const auto& jedges = jattachment.get_object_value(iedges);
+                                mesh->edges.resize(jedges.get_length());
+                                for (size_t e = 0; e < mesh->edges.size(); ++e)
+                                {
+                                    mesh->edges[e] = jedges.get_array_element(e).get_integer_value();
+                                }
+                            }
+
+                            m_loader->configureAttachment(mesh);
+                        }
+                        else
+                        {
+                            mesh->inheritFFD = !!jattachment.get_safe_integer_value_of_key(literal("ffd"), 1);
+                            const char* skin = jattachment.get_safe_string_value_of_key(literal("skin"));
+                            const auto& jparent = jattachment.get_object_value(iparent);
+                            const char* parent = jparent.get_string_value();
+                            m_linkedMeshes.emplace_back(mesh, skin, slotIndex, parent);
+                        }
                     }
                     break;
                     case Attachment::Type::WeightedMesh:
+                    case Attachment::Type::WeightedLinkedMesh:
                     {
                         auto mesh = static_cast<WeightedMeshAttachment*>(attachment);
-
-                        const auto& juvs = jattachment.get_value_of_key(literal("uvs"));
-                        auto numUVs = juvs.get_length();
-                        mesh->regionUVs.reserve(numUVs);
-                        for (size_t uv = 0; uv < numUVs; uv += 2)
-                        {
-                            float x = juvs.get_array_element(uv).get_safe_float_value();
-                            float y = juvs.get_array_element(uv + 1).get_safe_float_value();
-
-                            mesh->regionUVs.emplace_back(x, y);
-                        }
-
-                        const auto& jvertices = jattachment.get_value_of_key(literal("vertices"));
-                        auto numVertices = jvertices.get_length();
-
-                        size_t numBones = 0;
-                        size_t numWeights = 0;
-                        for (size_t v = 0; v < numVertices; )
-                        {
-                            int bc = jvertices.get_array_element(v).get_integer_value();
-                            numBones += bc + 1;
-                            numWeights += 3 * bc;
-                            v += 1 + bc * 4;
-                        }
-
-                        mesh->bones.resize(numBones);
-                        mesh->weights.resize(numWeights);
-
-                        int b = 0;
-                        int w = 0;
-                        for (size_t v = 0; v < numVertices;)
-                        {
-                            int bc = jvertices.get_array_element(v++).get_integer_value();
-                            mesh->bones[b++] = bc;
-                            for (int ib = 0; ib < bc; ++ib)
-                            {
-                                mesh->bones[b++] = jvertices.get_array_element(v).get_integer_value();
-                                mesh->weights[w++] = jvertices.get_array_element(v + 1).get_safe_float_value() * m_scale;
-                                mesh->weights[w++] = jvertices.get_array_element(v + 2).get_safe_float_value() * m_scale;
-                                mesh->weights[w++] = jvertices.get_array_element(v + 3).get_safe_float_value();
-                                v += 4;
-                            }
-                        }
-
-                        const auto& jtriangles = jattachment.get_value_of_key(literal("triangles"));
-                        auto numTriangles = jtriangles.get_length();
-                        mesh->triangles.resize(numTriangles);
-                        for (size_t t = 0; t < numTriangles; ++t)
-                        {
-                            mesh->triangles[t] = jtriangles.get_array_element(t).get_integer_value();
-                        }
-
-                        mesh->updateUVs();
 
                         string color = jattachment.get_safe_value_of_key_as_string(literal("color"));
                         mesh->color = Color_fromHexString(color);
 
-                        mesh->hullLength = jattachment.get_safe_integer_value_of_key(literal("hull"));
-
-                        auto iedges = jattachment.find_object_key(literal("edges"));
-                        if (iedges < jattachment.get_length())
-                        {
-                            const auto& jedges = jattachment.get_object_value(iedges);
-                            mesh->edges.resize(jedges.get_length());
-                            for (size_t e = 0; e < mesh->edges.size(); ++e)
-                            {
-                                mesh->edges[e] = jedges.get_array_element(e).get_integer_value();
-                            }
-                        }
-
                         mesh->size.x = jattachment.get_safe_float_value_of_key(literal("width"), 32) * m_scale;
                         mesh->size.y = jattachment.get_safe_float_value_of_key(literal("height"), 32) * m_scale;
+
+                        auto iparent = jattachment.find_object_key(literal("parent"));
+                        if (iparent == jattachment.get_length())
+                        {
+
+
+                            const auto& juvs = jattachment.get_value_of_key(literal("uvs"));
+                            auto numUVs = juvs.get_length();
+                            mesh->regionUVs.reserve(numUVs);
+                            for (size_t uv = 0; uv < numUVs; uv += 2)
+                            {
+                                float x = juvs.get_array_element(uv).get_safe_float_value();
+                                float y = juvs.get_array_element(uv + 1).get_safe_float_value();
+
+                                mesh->regionUVs.emplace_back(x, y);
+                            }
+
+                            const auto& jvertices = jattachment.get_value_of_key(literal("vertices"));
+                            auto numVertices = jvertices.get_length();
+
+                            size_t numBones = 0;
+                            size_t numWeights = 0;
+                            for (size_t v = 0; v < numVertices;)
+                            {
+                                int bc = jvertices.get_array_element(v).get_integer_value();
+                                numBones += bc + 1;
+                                numWeights += 3 * bc;
+                                v += 1 + bc * 4;
+                            }
+
+                            mesh->bones.resize(numBones);
+                            mesh->weights.resize(numWeights);
+
+                            int b = 0;
+                            int w = 0;
+                            for (size_t v = 0; v < numVertices;)
+                            {
+                                int bc = jvertices.get_array_element(v++).get_integer_value();
+                                mesh->bones[b++] = bc;
+                                for (int ib = 0; ib < bc; ++ib)
+                                {
+                                    mesh->bones[b++] = jvertices.get_array_element(v).get_integer_value();
+                                    mesh->weights[w++] = jvertices.get_array_element(v + 1).get_safe_float_value() * m_scale;
+                                    mesh->weights[w++] = jvertices.get_array_element(v + 2).get_safe_float_value() * m_scale;
+                                    mesh->weights[w++] = jvertices.get_array_element(v + 3).get_safe_float_value();
+                                    v += 4;
+                                }
+                            }
+
+                            const auto& jtriangles = jattachment.get_value_of_key(literal("triangles"));
+                            auto numTriangles = jtriangles.get_length();
+                            mesh->triangles.resize(numTriangles);
+                            for (size_t t = 0; t < numTriangles; ++t)
+                            {
+                                mesh->triangles[t] = jtriangles.get_array_element(t).get_integer_value();
+                            }
+
+                            mesh->updateUVs();
+
+                            mesh->hullLength = jattachment.get_safe_integer_value_of_key(literal("hull"));
+
+                            auto iedges = jattachment.find_object_key(literal("edges"));
+                            if (iedges < jattachment.get_length())
+                            {
+                                const auto& jedges = jattachment.get_object_value(iedges);
+                                mesh->edges.resize(jedges.get_length());
+                                for (size_t e = 0; e < mesh->edges.size(); ++e)
+                                {
+                                    mesh->edges[e] = jedges.get_array_element(e).get_integer_value();
+                                }
+                            }
+
+                            m_loader->configureAttachment(mesh);
+                        }
+                        else
+                        {
+                            mesh->inheritFFD = !!jattachment.get_safe_integer_value_of_key(literal("ffd"), 1);
+                            const char* skin = jattachment.get_safe_string_value_of_key(literal("skin"));
+                            const auto& jparent = jattachment.get_object_value(iparent);
+                            const char* parent = jparent.get_string_value();
+                            m_linkedMeshes.emplace_back(mesh, skin, slotIndex, parent);
+                        }
                     }
                     break;
                     case Attachment::Type::BoundingBox:
@@ -569,20 +620,52 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
 
                             bbox->vertices.emplace_back(x, y);
                         }
+
+                        m_loader->configureAttachment(bbox);
                     }
-                    break;
-                    case Attachment::Type::LinkedMesh:
-                    case Attachment::Type::WeightedLinkedMesh:
                     break;
                     }
                     
-
-                    m_loader->configureAttachment(attachment);
                     skin.m_entries.emplace_back(slotIndex, skinAttachmentName, attachment);
                 }
             }
         }
     }
+
+    /* Linked meshes. */
+    for (const auto& linkedMesh : m_linkedMeshes)
+    {
+        auto skin = linkedMesh.skin ? skeletonData->findSkin(linkedMesh.skin) : skeletonData->defaultSkin;
+        if (!skin)
+        {
+            setError("Linked mesh skin not found:", linkedMesh.skin);
+            return nullptr;
+        }
+
+        auto parent = skin->getAttachment(linkedMesh.slotIndex, linkedMesh.parent);
+        if (!parent)
+        {
+            setError("Parent mesh not found:", linkedMesh.parent);
+            return nullptr;
+        }
+
+        if (linkedMesh.mesh->type == Attachment::Type::Mesh)
+        {
+            auto mesh = static_cast<MeshAttachment*>(linkedMesh.mesh);
+            mesh->setParentMesh(static_cast<const MeshAttachment*>(parent));
+            mesh->updateUVs();
+        }
+        else
+        {
+            auto mesh = static_cast<WeightedMeshAttachment*>(linkedMesh.mesh);
+            mesh->setParentMesh(static_cast<const WeightedMeshAttachment*>(parent));
+            mesh->updateUVs();
+        }
+
+        m_loader->configureAttachment(linkedMesh.mesh);
+    }
+
+    m_linkedMeshes.clear();
 
     /* Events. */
     const auto ievents = root.find_object_key(literal("events"));
@@ -641,6 +724,7 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
     auto ibones = json.find_object_key(literal("bones"));
     auto islots = json.find_object_key(literal("slots"));
     auto iik = json.find_object_key(literal("ik"));
+    auto itransform = json.find_object_key(literal("transform"));
     auto iffd = json.find_object_key(literal("ffd"));
 
     auto idrawOrder = json.find_object_key(literal("drawOrder"));
@@ -868,6 +952,30 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
                         anim.duration = duration;
                     }
                 }
+                else if (strcmp(timelineTypeName, "shear") == 0)
+                {
+                    auto timeline = new ShearTimeline(int(jtimeline.get_length()));
+                    timeline->boneIndex = boneIndex;
+
+                    for (size_t f = 0; f < jtimeline.get_length(); ++f)
+                    {
+                        const auto& jframe = jtimeline.get_array_element(f);
+                        float time = jframe.get_safe_float_value_of_key(literal("time"));
+                        Vector sh;
+                        sh.x = jframe.get_safe_float_value_of_key(literal("x")) * m_scale;
+                        sh.y = jframe.get_safe_float_value_of_key(literal("y")) * m_scale;
+                        timeline->frames[f].time = time;
+                        timeline->frames[f].shear = sh;
+                        readCurve(timeline->frames[f], jframe);
+                    }
+
+                    anim.timelines.emplace_back(timeline);
+                    float duration = timeline->frames.back().time;
+                    if (duration > anim.duration)
+                    {
+                        anim.duration = duration;
+                    }
+                }
                 else
                 {
                     setError("Invalid timeline type for a bone", timelineTypeName);
@@ -877,7 +985,7 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
         }
     }
 
-    /* IK timelines. */
+    /* IK constraint timelines. */
     if (iik < len)
     {
         const auto& jiks = json.get_object_value(iik);
@@ -895,11 +1003,44 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
             {
                 const auto& jframe = jtimeline.get_array_element(f);
                 float time = jframe.get_safe_float_value_of_key(literal("time"));
-                float mix = jframe.get_safe_float_value_of_key(literal("mix"));
-                int bendPositive = jframe.get_safe_integer_value_of_key(literal("bendPositive"));
+                float mix = jframe.get_safe_float_value_of_key(literal("mix"), 1.f);
+                int bendPositive = jframe.get_safe_integer_value_of_key(literal("bendPositive"), 1);
                 timeline->frames[f].time = time;
                 timeline->frames[f].mix = mix;
                 timeline->frames[f].bendDirection = bendPositive ? 1 : -1;
+                readCurve(timeline->frames[f], jframe);
+            }
+
+            anim.timelines.emplace_back(timeline);
+            float duration = timeline->frames.back().time;
+            if (duration > anim.duration)
+            {
+                anim.duration = duration;
+            }
+        }
+    }
+
+    /* Transform constraint timelines. */
+    if (itransform < len)
+    {
+        const auto& jtransforms = json.get_object_value(itransform);
+        for (size_t i = 0; i < jtransforms.get_length(); ++i)
+        {
+            const auto& jtimeline = jtransforms.get_object_value(i);
+            const char* transformConstraintName = jtransforms.get_object_key(i);
+
+            auto transformConstraintIndex = skeletonData.findTransformConstraintIndex(transformConstraintName);
+            auto timeline = new TransformConstraintTimeline(int(jtimeline.get_length()));
+            timeline->transformConstraintIndex = transformConstraintIndex;
+
+            for (size_t f = 0; f < jtimeline.get_length(); ++f)
+            {
+                const auto& jframe = jtimeline.get_array_element(f);
+                timeline->frames[f].time = jframe.get_safe_float_value_of_key(literal("time"));
+                timeline->frames[f].rotateMix = jframe.get_safe_float_value_of_key(literal("rotateMix"), 1);
+                timeline->frames[f].translateMix = jframe.get_safe_float_value_of_key(literal("translateMix"), 1);
+                timeline->frames[f].scaleMix = jframe.get_safe_float_value_of_key(literal("scaleMix"), 1);
+                timeline->frames[f].shearMix = jframe.get_safe_float_value_of_key(literal("shearMix"), 1);
                 readCurve(timeline->frames[f], jframe);
             }
 

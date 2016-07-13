@@ -115,4 +115,9 @@ const TransformConstraintData* SkeletonData::findTransformConstraint(const char*
     return findByName(transformConstraints, constraintName);
 }
 
+int SkeletonData::findTransformConstraintIndex(const char* constraintName) const
+{
+    return findIndexByName(transformConstraints, constraintName);
+}
+
 }

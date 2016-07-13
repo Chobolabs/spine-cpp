@@ -51,8 +51,16 @@ public:
     const TransformConstraintData& data;
     Bone* bone;
     Bone* target;
+
+    float rotateMix;
     float translateMix;
-    Vector translation;
+    float scaleMix;
+    float shearMix;
+
+    float offsetRotation;
+    Vector offsetTranslation;
+    Vector offsetScale;
+    float offsetShearY;
 };
 
 }

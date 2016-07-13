@@ -74,6 +74,7 @@ struct SkeletonData
     int findIkConstraintIndex(const char* constraintName) const;
 
     const TransformConstraintData* findTransformConstraint(const char* constraintName) const;
+    int findTransformConstraintIndex(const char* constraintName) const;
 };
 
 }

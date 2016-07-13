@@ -18,7 +18,7 @@ Please read the [migration guide](https://github.com/Chobolabs/spine-cpp/blob/ma
 
 ## Limitations
 
-spine-cpp works with data exported from Spine 3.1.08. Updating to [v3.2](https://trello.com/c/k7KtGdPW/76-update-runtimes-to-support-v3-2-shearing) will commence after spine-c has support for it.
+spine-cpp works with data exported from Spine 3.2.07 (but not linked meshes yet). Support for 3.3 is in progress.
 
 Like the spine-c runtime binary loading is not yet supported.
 

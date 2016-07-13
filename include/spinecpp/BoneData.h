@@ -52,6 +52,7 @@ struct BoneData
     Vector translation;
     float rotation = 0;
     Vector scale;
+    Vector shear;
     bool inheritScale = true, inheritRotation = true;
 };
 

@@ -47,12 +47,14 @@ public:
         Scale,
         Rotate,
         Translate,
+        Shear,
         Color,
         Attachment,
         Event,
         Draworder,
         FFD,
         IkConstraint,
+        TransformConstraint
     };
 
     Timeline(Type type)

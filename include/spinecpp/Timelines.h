@@ -138,6 +138,25 @@ public:
     int boneIndex = 0;
 };
 
+class ShearTimeline : public CurveTimeline
+{
+public:
+    ShearTimeline(int framesCount);
+
+    virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
+
+    virtual void clearIdentityFrames() override;
+
+    struct Frame : public CurveFrame
+    {
+        float time;
+        Vector shear;
+    };
+
+    std::vector<Frame> frames;
+    int boneIndex = 0;
+};
+
 class ColorTimeline : public CurveTimeline
 {
 public:
@@ -264,6 +283,28 @@ public:
 
     std::vector<Frame> frames;
     int ikConstraintIndex = 0;
+};
+
+class TransformConstraintTimeline : public CurveTimeline
+{
+public:
+    TransformConstraintTimeline(int framesCount);
+
+    virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
+
+    virtual void clearIdentityFrames() override;
+
+    struct Frame : public CurveFrame
+    {
+        float time;
+        float rotateMix;
+        float translateMix;
+        float scaleMix;
+        float shearMix;
+    };
+
+    std::vector<Frame> frames;
+    int transformConstraintIndex = 0;
 };
 
 }

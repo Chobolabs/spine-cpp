@@ -69,129 +69,134 @@ void IkConstraint::apply()
 
 void IkConstraint::apply1(Bone& bone, Vector target, float alpha)
 {
-    float parentRotation = bone.isRoot() ? 0 : bone.parent->getWorldRotationX();
-    float rotation = bone.rotation;
-    float rotationIK = atan2(target.y - bone.worldPos.y, target.x - bone.worldPos.x) * RAD_DEG - parentRotation;
+    auto pp = bone.parent;
+    float id = 1 / (pp->a * pp->d - pp->b * pp->c);
+    auto pos = target - pp->worldPos;
+    float tx = (pos.x * pp->d - pos.y * pp->b) * id - bone.translation.x,
+        ty = (pos.y * pp->a - pos.x * pp->c) * id - bone.translation.y;
 
-    if ((bone.worldSign.x != bone.worldSign.y) != (bone.skeleton.flipX != (bone.skeleton.flipY != Bone::isYDown())))
-        rotationIK = 360 - rotationIK;
-    if (rotationIK > 180) rotationIK -= 360;
-    else if (rotationIK < -180) rotationIK += 360;
-    bone.updateWorldTransformWith(bone.translation, rotation + (rotationIK - rotation) * alpha, bone.appliedScale);
+    float rotationIK = atan2(ty, tx) * RAD_DEG - bone.shear.x;
+    if (bone.scale.x < 0) 
+        rotationIK += 180;
+    
+    if (rotationIK > 180)
+        rotationIK -= 360;
+    else if (rotationIK < -180) 
+        rotationIK += 360;
+
+    bone.updateWorldTransformWith(bone.translation, bone.rotation + (rotationIK - bone.rotation) * alpha, bone.appliedScale, bone.shear);
 }
 
 void IkConstraint::apply2(Bone& parent, Bone& child, Vector target, int bendDir, float alpha)
 {
     float px = parent.translation.x, py = parent.translation.y, psx = parent.appliedScale.x, psy = parent.appliedScale.y;
-    float cx = child.translation.x, cy = child.translation.y, csx = child.appliedScale.x, cwx = child.worldPos.x, cwy = child.worldPos.y;
-    int o1, o2, s2, u;
-    const Bone* pp = parent.parent;
-    float tx, ty, dx, dy, l1, l2, a1, a2, r;
+    int os1, os2, s2;
+    float cx, cy, csx;
+    int u;
+    const Bone *pp;
+    float ppa, ppb, ppc, ppd, id;
+    float x, y;
+    float tx, ty;
+    float dx, dy;
+    float l1, l2, a1, a2;
+    float os;
+    float rotation;
+
     if (alpha == 0) return;
     if (psx < 0) {
         psx = -psx;
-        o1 = 180;
+        os1 = 180;
         s2 = -1;
     }
     else {
-        o1 = 0;
+        os1 = 0;
         s2 = 1;
     }
     if (psy < 0) {
         psy = -psy;
         s2 = -s2;
     }
-    r = psx - psy;
-    u = (r < 0 ? -r : r) <= 0.0001f;
+    cx = child.translation.x; cy = child.translation.y; csx = child.appliedScale.x;
+    u = abs(psx - psy) <= 0.0001f;
     if (!u && cy != 0) {
-        cwx = parent.a * cx + parent.worldPos.x;
-        cwy = parent.c * cx + parent.worldPos.y;
+        child.worldPos.x = parent.a * cx + parent.worldPos.x;
+        child.worldPos.y = parent.c * cx + parent.worldPos.y;
         cy = 0;
     }
     if (csx < 0) {
         csx = -csx;
-        o2 = 180;
+        os2 = 180;
     }
     else
-        o2 = 0;
-    if (!pp) {
-        tx = target.x - px;
-        ty = target.y - py;
-        dx = cwx - px;
-        dy = cwy - py;
-    }
-    else {
-        float a = pp->a, b = pp->b, c = pp->c, d = pp->d, invDet = 1 / (a * d - b * c);
-        float wx = pp->worldPos.x, wy = pp->worldPos.y, x = target.x - wx, y = target.y - wy;
-        tx = (x * d - y * b) * invDet - px;
-        ty = (y * a - x * c) * invDet - py;
-        x = cwx - wx;
-        y = cwy - wy;
-        dx = (x * d - y * b) * invDet - px;
-        dy = (y * a - x * c) * invDet - py;
-    }
-    l1 = sqrt(dx * dx + dy * dy);
-    l2 = child.data.length * csx;
+        os2 = 0;
+    pp = parent.parent;
+    ppa = pp->a; ppb = pp->b; ppc = pp->c; ppd = pp->d; id = 1 / (ppa * ppd - ppb * ppc);
+    x = target.x - pp->worldPos.x; y = target.y - pp->worldPos.y;
+    tx = (x * ppd - y * ppb) * id - px; ty = (y * ppa - x * ppc) * id - py;
+    x = child.worldPos.x - pp->worldPos.x;
+    y = child.worldPos.y - pp->worldPos.y;
+    dx = (x * ppd - y * ppb) * id - px; dy = (y * ppa - x * ppc) * id - py;
+    l1 = sqrt(dx * dx + dy * dy); l2 = child.data.length * csx;
+outer:
     if (u) {
-        float cos, a, o;
+        float cosine, a, o;
         l2 *= psx;
-        cos = (tx * tx + ty * ty - l1 * l1 - l2 * l2) / (2 * l1 * l2);
-        if (cos < -1) cos = -1;
-        else if (cos > 1) cos = 1;
-        a2 = acos(cos) * bendDir;
-        a = l1 + l2 * cos;
-        o = l2 * sin(a2);
+        cosine = (tx * tx + ty * ty - l1 * l1 - l2 * l2) / (2 * l1 * l2);
+        if (cosine < -1)
+            cosine = -1;
+        else if (cosine > 1) cosine = 1;
+        a2 = acos(cosine) * bendDir;
+        a = l1 + l2 * cosine, o = l2 * sin(a2);
         a1 = atan2(ty * a - tx * o, tx * a + ty * o);
     }
     else {
+        float minAngle, minDist, minX, minY, maxAngle, maxDist, maxX, maxY, angle;
         float a = psx * l2, b = psy * l2, ta = atan2(ty, tx);
         float aa = a * a, bb = b * b, ll = l1 * l1, dd = tx * tx + ty * ty;
         float c0 = bb * ll + aa * dd - aa * bb, c1 = -2 * bb * l1, c2 = bb - aa;
         float d = c1 * c1 - 4 * c2 * c0;
-        float minAngle = 0, minDist = std::numeric_limits<float>::max(), minX = 0, minY = 0;
-        float maxAngle = 0, maxDist = 0, maxX = 0, maxY = 0;
-        float x = l1 + a, dist = x * x, angle, y;
         if (d >= 0) {
-            float q = sqrt(d), r0, r1, ar0, ar1;;
+            float q = sqrt(d), r0, r, r1;
             if (c1 < 0) q = -q;
             q = -(c1 + q) / 2;
-            r0 = q / c2;
-            r1 = c0 / q;
-            ar0 = r0 < 0 ? -r0 : r0;
-            ar1 = r1 < 0 ? -r1 : r1;
-            r = ar0 < ar1 ? r0 : r1;
+            r0 = q / c2; r1 = c0 / q;
+            r = abs(r0) < abs(r1) ? r0 : r1;
             if (r * r <= dd) {
-                float y1 = sqrt(dd - r * r) * bendDir;
-                a1 = ta - atan2(y1, r);
-                a2 = atan2(y1 / psy, (r - l1) / psx);
+                y = sqrt(dd - r * r) * bendDir;
+                a1 = ta - atan2(y, r);
+                a2 = atan2(y / psy, (r - l1) / psx);
                 goto outer;
             }
         }
-        if (dist > maxDist) {
+        minAngle = 0; minDist = std::numeric_limits<float>::max(); minX = 0; minY = 0;
+        maxAngle = 0; maxDist = 0; maxX = 0; maxY = 0;
+        x = l1 + a;
+        d = x * x;
+        if (d > maxDist) {
             maxAngle = 0;
-            maxDist = dist;
+            maxDist = d;
             maxX = x;
         }
         x = l1 - a;
-        dist = x * x;
-        if (dist < minDist) {
+        d = x * x;
+        if (d < minDist) {
             minAngle = PI;
-            minDist = dist;
+            minDist = d;
             minX = x;
         }
         angle = acos(-a * l1 / (aa - bb));
         x = a * cos(angle) + l1;
         y = b * sin(angle);
-        dist = x * x + y * y;
-        if (dist < minDist) {
+        d = x * x + y * y;
+        if (d < minDist) {
             minAngle = angle;
-            minDist = dist;
+            minDist = d;
             minX = x;
             minY = y;
         }
-        if (dist > maxDist) {
+        if (d > maxDist) {
             maxAngle = angle;
-            maxDist = dist;
+            maxDist = d;
             maxX = x;
             maxY = y;
         }
@@ -204,19 +209,20 @@ void IkConstraint::apply2(Bone& parent, Bone& child, Vector target, int bendDir,
             a2 = maxAngle * bendDir;
         }
     }
-    outer: {
-        float os = atan2(cy, cx) * s2;
-        a1 = (a1 - os) * RAD_DEG + o1;
-        a2 = (a2 + os) * RAD_DEG * s2 + o2;
-        if (a1 > 180) a1 -= 360;
-        else if (a1 < -180) a1 += 360;
-        if (a2 > 180) a2 -= 360;
-        else if (a2 < -180) a2 += 360;
-        r = parent.rotation;
-        parent.updateWorldTransformWith(Vector(px, py), r + (a1 - r) * alpha, parent.appliedScale);
-        r = child.rotation;
-        child.updateWorldTransformWith(Vector(cx, cy), r + (a2 - r) * alpha, child.appliedScale);
-    }
+    os = atan2(cy, cx) * s2;
+    a1 = (a1 - os) * RAD_DEG + os1;
+    a2 = ((a2 + os) * RAD_DEG - child.shear.x) * s2 + os2;
+    if (a1 > 180)
+        a1 -= 360;
+    else if (a1 < -180) a1 += 360;
+    if (a2 > 180)
+        a2 -= 360;
+    else if (a2 < -180) a2 += 360;
+
+    rotation = parent.rotation;
+    parent.updateWorldTransformWith(Vector(px, py), rotation + (a1 - rotation) * alpha, parent.appliedScale, Vector(0, 0));
+    rotation = child.rotation;
+    child.updateWorldTransformWith(Vector(cx, cy), rotation + (a2 - rotation) * alpha, child.appliedScale, child.shear);
 }
 
 }

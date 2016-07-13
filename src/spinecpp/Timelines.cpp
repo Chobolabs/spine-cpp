@@ -324,6 +324,55 @@ void ScaleTimeline::clearIdentityFrames()
 
 ///////////////////////////////////////////////////////////////////////////////
 
+ShearTimeline::ShearTimeline(int framesCount)
+    : CurveTimeline(framesCount, Timeline::Type::Shear)
+{
+    frames.resize(framesCount);
+    initFramesBezeierData(frames, m_bezierDataBuffer);
+}
+
+void ShearTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const
+{
+    if (time < frames.front().time) return; // time is before first frame
+
+    auto& bone = skeleton.bones[boneIndex];
+
+    if (time >= frames.back().time) // time is after last frame
+    {
+        bone.shear += (bone.data.shear * frames.back().shear - bone.shear) * alpha;
+        return;
+    }
+
+    // Interpolate between the previous frame and the current frame.
+    auto curFrame = findFrame(frames, time);
+    auto prevFrame = curFrame - 1;
+
+    float percent = 1 - (time - curFrame->time) / (prevFrame->time - curFrame->time);
+    percent = prevFrame->getCurvePercent(saturate(percent));
+
+    bone.shear += 
+        (bone.data.shear 
+        + (prevFrame->shear + (curFrame->shear - prevFrame->shear) * percent)
+        - bone.shear
+        ) * alpha;
+}
+
+void ShearTimeline::clearIdentityFrames()
+{
+    auto shear = frames.front().shear;
+    for (size_t i = 1; i < frames.size(); ++i)
+    {
+        if (frames[i].shear != shear)
+        {
+            return;
+        }
+    }
+
+    frames.erase(frames.begin() + 1, frames.end());
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 ColorTimeline::ColorTimeline(int framesCount)
     : CurveTimeline(framesCount, Timeline::Type::Color)
 {
@@ -737,12 +786,12 @@ void IkConstraintTimeline::apply(Skeleton& skeleton, float lastTime, float time,
 {
     if (time < frames.front().time) return; // time is before first frame
 
-    auto& ikConstraint = skeleton.ikConstraints[ikConstraintIndex];
+    auto& constraint = skeleton.ikConstraints[ikConstraintIndex];
 
     if (time >= frames.back().time) // time is after last frame
     {
-        ikConstraint.mix += (frames.back().mix - ikConstraint.mix) * alpha;
-        ikConstraint.bendDirection = frames.back().bendDirection;
+        constraint.mix += (frames.back().mix - constraint.mix) * alpha;
+        constraint.bendDirection = frames.back().bendDirection;
         return;
     }
 
@@ -754,8 +803,8 @@ void IkConstraintTimeline::apply(Skeleton& skeleton, float lastTime, float time,
     percent = prevFrame->getCurvePercent(saturate(percent));
 
     float mix = prevFrame->mix + (curFrame->mix - prevFrame->mix) * percent;
-    ikConstraint.mix += (mix - ikConstraint.mix) * alpha;
-    ikConstraint.bendDirection = prevFrame->bendDirection;
+    constraint.mix += (mix - constraint.mix) * alpha;
+    constraint.bendDirection = prevFrame->bendDirection;
 }
 
 void IkConstraintTimeline::clearIdentityFrames()
@@ -773,5 +822,80 @@ void IkConstraintTimeline::clearIdentityFrames()
     frames.erase(frames.begin() + 1, frames.end());
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+TransformConstraintTimeline::TransformConstraintTimeline(int framesCount)
+    : CurveTimeline(framesCount, Timeline::Type::TransformConstraint)
+{
+    frames.resize(framesCount);
+    initFramesBezeierData(frames, m_bezierDataBuffer);
+}
+
+void TransformConstraintTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const
+{
+    if (time < frames.front().time) return; // time is before first frame
+
+    auto& constraint = skeleton.transformConstraints[transformConstraintIndex];
+
+    if (time >= frames.back().time) // time is after last frame
+    {
+        constraint.rotateMix += (frames.back().rotateMix - constraint.rotateMix) * alpha;
+        constraint.translateMix += (frames.back().translateMix - constraint.translateMix) * alpha;
+        constraint.scaleMix += (frames.back().scaleMix - constraint.scaleMix) * alpha;
+        constraint.shearMix += (frames.back().shearMix - constraint.shearMix) * alpha;
+        return;
+    }
+
+    /* Interpolate between the previous frame and the current frame. */
+    // Interpolate between the previous frame and the current frame.
+    auto curFrame = findFrame(frames, time);
+    auto prevFrame = curFrame - 1;
+
+    float percent = 1 - (time - curFrame->time) / (prevFrame->time - curFrame->time);
+    percent = prevFrame->getCurvePercent(saturate(percent));
+
+    auto rotate = curFrame->rotateMix;
+    auto translate = curFrame->translateMix;
+    auto scale = curFrame->scaleMix;
+    auto shear = curFrame->shearMix;
+
+    constraint.rotateMix += (rotate + (prevFrame->rotateMix - rotate) * percent - constraint.rotateMix) * alpha;
+    constraint.translateMix += (translate + (prevFrame->translateMix - translate) * percent - constraint.translateMix) * alpha;
+    constraint.scaleMix += (scale + (prevFrame->scaleMix - scale) * percent - constraint.scaleMix) * alpha;
+    constraint.shearMix += (shear + (prevFrame->shearMix - shear) * percent - constraint.shearMix) * alpha;
+}
+
+void TransformConstraintTimeline::clearIdentityFrames()
+{
+    float rotateMix = frames.front().rotateMix;
+    float translateMix = frames.front().translateMix;
+    float scaleMix = frames.front().scaleMix;
+    float shearMix = frames.front().shearMix;
+
+    for (size_t i = 1; i < frames.size(); ++i)
+    {
+        if (frames[i].rotateMix != rotateMix)
+        {
+            return;
+        }
+
+        if (frames[i].translateMix != translateMix)
+        {
+            return;
+        }
+
+        if (frames[i].scaleMix != scaleMix)
+        {
+            return;
+        }
+
+        if (frames[i].shearMix != shearMix)
+        {
+            return;
+        }
+    }
+
+    frames.erase(frames.begin() + 1, frames.end());
+}
 
 }

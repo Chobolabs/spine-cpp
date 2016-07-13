@@ -122,7 +122,7 @@ void Skeleton::updateCache()
         for (auto i = m_updateCache.rbegin(); i != m_updateCache.rend(); ++i)
         {
             auto updatable = i->data;
-            if (updatable == tc.bone || updatable == tc.target)
+            if (updatable == tc.bone)
             {
                 m_updateCache.emplace(i.base(), tc);
                 break;
@@ -171,8 +171,10 @@ void Skeleton::setBonesToSetupPose()
 
     for (auto& tc : transformConstraints)
     {
+        tc.rotateMix = tc.data.rotateMix;
         tc.translateMix = tc.data.translateMix;
-        tc.translation = tc.data.translation;
+        tc.scaleMix = tc.data.scaleMix;
+        tc.shearMix = tc.data.shearMix;
     }
 }
 

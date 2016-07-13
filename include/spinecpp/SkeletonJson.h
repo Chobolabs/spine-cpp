@@ -32,6 +32,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace spine
 {
@@ -41,6 +42,7 @@ class Atlas;
 struct SkeletonData;
 class Animation;
 struct CurveFrame;
+class Attachment;
 
 namespace sajson
 {
@@ -67,11 +69,27 @@ private:
     void readAnimation(Animation& outAnim, const SkeletonData& skeletonData, const sajson::value& json);
     void readCurve(CurveFrame& frame, const sajson::value& json);
 
+    struct LinkedMesh
+    {
+        LinkedMesh(Attachment* mesh, const char* skin, int slotIndex, const char* parent)
+            : mesh(mesh)
+            , skin(skin)
+            , slotIndex(slotIndex)
+            , parent(parent)
+        {}
+
+        Attachment* mesh;
+        const char* skin;
+        int slotIndex;
+        const char* parent;
+    };
 
     float m_scale = 1.f;
     bool m_ownsLoader;
     AttachmentLoader* m_loader;
     std::string m_error;
+
+    std::vector<LinkedMesh> m_linkedMeshes;
 };
 
 }

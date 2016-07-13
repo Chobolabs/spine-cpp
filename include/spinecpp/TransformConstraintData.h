@@ -40,14 +40,22 @@ struct TransformConstraintData
 {
     TransformConstraintData(const std::string& name)
         : name(name)
-        , translation(0, 0)
+        , offsetTranslation(0, 0)
+        , offsetScale(0, 0)
     {}
 
     const std::string name;
     const BoneData* bone = nullptr;
     const BoneData* target = nullptr;
+    float rotateMix = 0;
     float translateMix = 0;
-    Vector translation;
+    float scaleMix = 0;
+    float shearMix = 0;
+
+    float offsetRotation = 0;
+    Vector offsetTranslation;
+    Vector offsetScale;
+    float offsetShearY = 0;
 };
 
 }

@@ -50,7 +50,7 @@ public:
 
     void setToSetupPose();
     void updateWorldTransform();
-    void updateWorldTransformWith(Vector translation, float rotation, Vector scale);
+    void updateWorldTransformWith(Vector translation, float rotation, Vector scale, Vector shear);
 
     float getWorldRotationX() const;
     float getWorldRotationY() const;
@@ -73,6 +73,7 @@ public:
     Vector translation;
     float rotation;
     Vector scale;
+    Vector shear;
 
     float appliedRotation;
     Vector appliedScale;

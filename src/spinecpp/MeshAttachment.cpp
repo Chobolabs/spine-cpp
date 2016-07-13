@@ -33,6 +33,7 @@
 #include <spinecpp/Slot.h>
 #include <spinecpp/Bone.h>
 #include <spinecpp/Skeleton.h>
+#include <cassert>
 
 namespace spine
 {
@@ -94,6 +95,11 @@ void MeshAttachment::computeWorldVertices(const Slot& slot, float* worldVertices
         worldVertices[i + 1] = vertex.x * bone.c + vertex.y * bone.d + y;
         i += 2;
     }
+}
+
+void MeshAttachment::setParentMesh(const MeshAttachment* parentMesh)
+{
+    assert(false);
 }
 
 }

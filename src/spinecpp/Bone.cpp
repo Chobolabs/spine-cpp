@@ -37,6 +37,21 @@
 
 using namespace std;
 
+namespace
+{
+
+inline float sin_deg(float f)
+{
+    return sin(f * DEG_RAD);
+}
+
+inline float cos_deg(float f)
+{
+    return cos(f * DEG_RAD);
+}
+
+}
+
 namespace spine
 {
 
@@ -65,22 +80,22 @@ void Bone::setToSetupPose()
     translation = data.translation;
     rotation = data.rotation;
     scale = data.scale;
+    shear = data.shear;
 }
 
 void Bone::updateWorldTransform()
 {
-    updateWorldTransformWith(translation, rotation, scale);
+    updateWorldTransformWith(translation, rotation, scale, shear);
 }
 
-void Bone::updateWorldTransformWith(Vector translation, float rotation, Vector scale)
+void Bone::updateWorldTransformWith(Vector translation, float rotation, Vector scale, Vector shear)
 {
     appliedRotation = rotation;
     appliedScale = scale;
 
-    float radians = rotation * DEG_RAD;
-    float cosine = cos(radians);
-    float sine = sin(radians);
-    float la = cosine * scale.x, lb = -sine * scale.y, lc = sine * scale.x, ld = cosine * scale.y;
+    float rotationY = rotation + 90 + shear.y;
+    float la = cos_deg(rotation + shear.x) * scale.x, lb = cos_deg(rotationY) * scale.y;
+    float lc = sin_deg(rotation + shear.x) * scale.x, ld = sin_deg(rotationY) * scale.y;
 
     if (!parent) // Root bone.
     {
@@ -140,8 +155,8 @@ void Bone::updateWorldTransformWith(Vector translation, float rotation, Vector s
 
             do
             {
-                cosine = cos(p->appliedRotation * DEG_RAD);
-                sine = sin(p->appliedRotation * DEG_RAD);
+                float cosine = cos_deg(p->appliedRotation); 
+                float sine = sin_deg(p->appliedRotation);
                 float temp = pa * cosine + pb * sine;
                 pb = pa * -sine + pb * cosine;
                 pa = temp;
@@ -169,13 +184,15 @@ void Bone::updateWorldTransformWith(Vector translation, float rotation, Vector s
 
             do {
                 float za, zb, zc, zd;
-                float r = p->rotation;
-                float psx = p->appliedScale.x, psy = appliedScale.y;
-                cosine = cos(r * DEG_RAD);
-                sine = sin(r * DEG_RAD);
-                za = cosine * psx;
-                zb = -sine * psy;
-                zc = sine * psx;
+                
+                float r = p->appliedRotation;
+                float psx = p->appliedScale.x; 
+                float psy = p->appliedScale.y;
+                float cosine = cos_deg(r); 
+                float sine = sin_deg(r);
+                za = cosine * psx; 
+                zb = -sine * psy; 
+                zc = sine * psx; 
                 zd = cosine * psy;
                 float temp = pa * za + pb * zc;
                 pb = pa * zb + pb * zd;
@@ -185,8 +202,8 @@ void Bone::updateWorldTransformWith(Vector translation, float rotation, Vector s
                 pc = temp;
 
                 if (psx < 0) r = -r;
-                cosine = cos(-r * DEG_RAD);
-                sine = sin(-r * DEG_RAD);
+                cosine = cos_deg(-r);
+                sine = sin_deg(-r);
                 temp = pa * cosine + pb * sine;
                 pb = pa * -sine + pb * cosine;
                 pa = temp;

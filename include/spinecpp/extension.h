@@ -34,6 +34,7 @@
 #include "Atlas.h"
 
 #define PI 3.1415926535897932385f
+#define PI_DBL (PI * 2)
 #define DEG_RAD (PI / 180)
 #define RAD_DEG (180 / PI)
 
