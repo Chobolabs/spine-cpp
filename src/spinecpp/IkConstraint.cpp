@@ -36,6 +36,8 @@
 #include <cmath>
 #include <limits>
 
+using namespace std;
+
 namespace spine
 {
 

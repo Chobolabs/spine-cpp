@@ -33,6 +33,9 @@
 #include <spinecpp/Skeleton.h>
 #include <spinecpp/extension.h>
 
+#include <cmath>
+using namespace std;
+
 namespace spine
 {
 
