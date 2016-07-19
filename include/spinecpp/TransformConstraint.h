@@ -49,18 +49,13 @@ public:
     void apply();
 
     const TransformConstraintData& data;
-    Bone* bone;
+    std::vector<Bone*> bones;
     Bone* target;
 
     float rotateMix;
     float translateMix;
     float scaleMix;
     float shearMix;
-
-    float offsetRotation;
-    Vector offsetTranslation;
-    Vector offsetScale;
-    float offsetShearY;
 };
 
 }

@@ -32,6 +32,7 @@
 #pragma once
 
 #include <spinecpp/BoneData.h>
+#include <vector>
 
 namespace spine
 {
@@ -45,7 +46,7 @@ struct TransformConstraintData
     {}
 
     const std::string name;
-    const BoneData* bone = nullptr;
+    std::vector<const BoneData*> bones;
     const BoneData* target = nullptr;
     float rotateMix = 0;
     float translateMix = 0;

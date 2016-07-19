@@ -233,15 +233,19 @@ Atlas* Atlas::create(const char* begin, int length, const std::string& prefixDir
             page->magFilter = Filter(indexOf(textureFilterNames, 7, tuple + 1));
 
             if (!readValue(&begin, end, &str)) return abortAtlas(atlas);
+
+            page->uWrap = Wrap::ClampToEdge;
+            page->vWrap = Wrap::ClampToEdge;
             if (!equals(&str, "none")) {
-                page->uWrap = Wrap::ClampToEdge;
-                page->vWrap = Wrap::ClampToEdge;
-                if (*str.begin == 'x')
+				if (str.end - str.begin == 1) {
+					if (*str.begin == 'x')
+						page->uWrap = Wrap::Repeat;
+					else if (*str.begin == 'y')
+                        page->vWrap = Wrap::Repeat;
+				} else if (equals(&str, "xy")) {
                     page->uWrap = Wrap::Repeat;
-                else if (*str.begin == 'y')
                     page->vWrap = Wrap::Repeat;
-                else
-                    page->uWrap = page->vWrap = Wrap::Repeat;
+				}
             }
 
             AtlasPage_createTexture(*page, path);

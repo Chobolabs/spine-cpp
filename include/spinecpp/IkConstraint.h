@@ -59,6 +59,8 @@ public:
 
     int bendDirection;
     float mix;
+
+    int level;
 };
 
 }

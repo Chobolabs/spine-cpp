@@ -31,74 +31,46 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <spinecpp/BoneData.h>
+#include <string>
 #include <vector>
 
 namespace spine
 {
 
-class Skeleton;
+struct BoneData;
+struct SlotData;
 
-struct Bone
+enum class PositionMode
 {
-public:
-    static void setYDown(bool yDown);
-    static bool isYDown();
+    Fixed, Percent
+};
 
-    Bone(const BoneData& data, const Skeleton& skeleton, Bone* parent);
+enum class SpacingMode
+{
+    Length, Fixed, Percent
+};
 
-    const std::string& getName() const { return data.name; }
+enum class RotateMode
+{
+    Tangent, Chain, ChainScale
+};
 
-    void setToSetupPose();
-    void updateWorldTransform();
-    void updateWorldTransformWith(Vector translation, float rotation, Vector scale, Vector shear);
+struct PathConstraintData
+{
+    PathConstraintData(const std::string& name)
+        : name(name)
+    {}
 
-    float getWorldRotationX() const;
-    float getWorldRotationY() const;
-    float getWorldScaleX() const;
-    float getWorldScaleY() const;
+    const std::string name;
+    std::vector<const BoneData*> bones;
+    const SlotData* target = nullptr;
+    
+    PositionMode positionMode = PositionMode::Fixed;
+    SpacingMode spacingMode = SpacingMode::Length;
+    RotateMode rotateMode = RotateMode::Tangent;
 
-    float worldToLocalRotationX() const;
-    float worldToLocalRotationY() const;
-
-    void rotateWorld(float degrees);
-    void updateLocalTransform();
-
-    void worldToLocal(Vector world, Vector& outLocal);
-    void localToWorld(Vector local, Vector& outWorld);
-
-    bool isRoot() const { return !parent; }
-
-    // links
-    const BoneData& data;
-    const Skeleton& skeleton;
-    Bone* const parent;
-    std::vector<Bone*> children;
-
-    // Logical data
-
-    // user data
-    Vector translation;
-    float rotation;
-    Vector scale;
-    Vector shear;
-
-    float appliedRotation;
-
-    // Physical data
-
-    // world tranform 2x2 matrix
-    float a, b;
-    float c, d;
-
-    Vector worldPos;
-    Vector worldSign;
-
-    // Internal data
-    int/*bool*/ sorted;
-
-private:
-    static bool m_isYDown;
+    float offsetRotation = 0;
+    float position = 0, spacing = 0, rotateMix = 0, translateMix = 0;
 };
 
 }

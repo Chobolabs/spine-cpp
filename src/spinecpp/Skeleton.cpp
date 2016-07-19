@@ -30,6 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ////////////////////////////////////////////////////////////////////////////////
 #include <spinecpp/Skeleton.h>
+#include <spinecpp/PathAttachment.h>
 
 #include <cassert>
 
@@ -55,27 +56,18 @@ Skeleton::Skeleton(const SkeletonData& data)
         }
 
         bones.emplace_back(bd, *this, parent);
+        
+        if (parent)
+        {
+            parent->children.push_back(&bones.back());
+        }
     }
 
     slots.reserve(data.slots.size());
     for (auto& sd : data.slots)
     {
-        Bone* bone = nullptr;
-
-        for (auto& b : bones)
-        {
-            if (&b.data == sd.boneData)
-            {
-                bone = &b;
-                break;
-            }
-        }
-
-        assert(bone);
-        if (bone)
-        {
-            slots.emplace_back(sd, *bone);
-        }
+        Bone& bone = bones[sd.boneData->index];
+        slots.emplace_back(sd, bone);
     }
 
     drawOrder.reserve(slots.size());
@@ -89,6 +81,7 @@ Skeleton::Skeleton(const SkeletonData& data)
     {
         ikConstraints.emplace_back(ikd, *this);
     }
+    ikConstraintsSorted.resize(ikConstraints.size());
 
     transformConstraints.reserve(data.transformConstraints.size());
     for (auto& tcd : data.transformConstraints)
@@ -96,7 +89,60 @@ Skeleton::Skeleton(const SkeletonData& data)
         transformConstraints.emplace_back(tcd, *this);
     }
 
+    pathConstraints.reserve(data.pathConstraints.size());
+    for (auto& pcd : data.pathConstraints)
+    {
+        pathConstraints.emplace_back(pcd, *this);
+    }
+
     updateCache();
+}
+
+
+void Skeleton::sortBone(Bone& bone)
+{
+    if (bone.sorted) return;
+    if (bone.parent) sortBone(*bone.parent);
+    bone.sorted = 1;
+    m_updateCache.emplace_back(bone);
+}
+
+
+void Skeleton::sortPathConstraintAttachmentBones(const Attachment* attachment, Bone& slotBone)
+{
+    if (attachment->type != Attachment::Type::Path) return;
+
+    auto pathAttachment = static_cast<const PathAttachment*>(attachment);
+    auto& pathBones = pathAttachment->bones;
+    if (pathBones.empty())
+    {
+        sortBone(slotBone);
+    }
+    else
+    {
+        for (auto boneIndex : pathBones)
+        {
+            sortBone(bones[boneIndex]);
+        }
+    }
+}
+
+void Skeleton::sortPathConstraintAttachment(const Skin& skin, int slotIndex, Bone& slotBone)
+{
+    for (auto& entry : skin.m_entries)
+    {
+        if (entry.slotIndex == slotIndex)
+            sortPathConstraintAttachmentBones(entry.attachment, slotBone);
+    }
+}
+
+void Skeleton::sortReset(std::vector<Bone*>& bones)
+{
+    for (auto bone : bones)
+    {
+        if (bone->sorted) sortReset(bone->children);
+        bone->sorted = false;
+    }
 }
 
 void Skeleton::updateCache()
@@ -106,28 +152,127 @@ void Skeleton::updateCache()
 
     for (auto& bone : bones)
     {
-        m_updateCache.emplace_back(bone);
-        for (auto& ik : ikConstraints)
+        bone.sorted = false;
+    }
+
+    // IK first, lowest hierarchy depth first.
+    ikConstraintsSorted.resize(ikConstraints.size());
+    for (size_t i = 0; i < ikConstraints.size(); ++i)
+    {
+        ikConstraintsSorted[i] = &ikConstraints[i];
+    }
+
+    auto& ikConstraints = ikConstraintsSorted;
+
+    for (auto ik : ikConstraints)
+    {
+        auto bone = ik->bones[0]->parent;
+        int level = 0;
+        while (bone)
         {
-            if (&bone == ik.bones.back())
-            {
-                m_updateCache.emplace_back(ik);
-                break;
-            }
+            bone = bone->parent;
+            ++level;
+        }
+        ik->level = level;
+    }
+
+    for (size_t i = 1; i < ikConstraints.size(); ++i)
+    {
+        auto ik = ikConstraints[i];
+        auto level = ik->level;
+        
+        int ii;
+        for (ii = int(i) - 1; ii >= 0; --ii) {
+            auto other = ikConstraints[ii];
+            if (other->level < level) break;
+            ikConstraints[ii + 1] = other;
+        }
+        ikConstraints[ii + 1] = ik;
+    }
+
+    for (auto ik : ikConstraints)
+    {
+        auto target = ik->target;
+        sortBone(*target);
+
+        auto& constrained = ik->bones;
+        auto parent = constrained[0];
+        sortBone(*parent);
+
+        m_updateCache.emplace_back(*ik);
+
+        sortReset(parent->children);
+        constrained.back()->sorted = 1;
+    }
+
+    for (auto& constraint : pathConstraints)
+    {
+        auto slot = constraint.target;
+        int slotIndex = slot->data.index;
+        auto& slotBone = slot->bone;
+
+        if (m_skin)
+        {
+            sortPathConstraintAttachment(*m_skin, slotIndex, slotBone);
+        }
+        
+        if (data.defaultSkin && data.defaultSkin != m_skin)
+        {
+            sortPathConstraintAttachment(*data.defaultSkin, slotIndex, slotBone);
+        }
+
+        for (auto& skin : data.skins)
+        {
+            sortPathConstraintAttachment(skin, slotIndex, slotBone);
+        }
+
+        sortPathConstraintAttachmentBones(slot->getAttachment(), slotBone);
+
+        auto& constrained = constraint.bones;
+        for (auto bone : constrained)
+        {
+            sortBone(*bone);
+        }
+
+        m_updateCache.emplace_back(constraint);
+
+        for (auto bone : constrained)
+        {
+            sortReset(bone->children);
+        }
+
+        for (auto bone : constrained)
+        {
+            bone->sorted = true;
         }
     }
 
-    for (auto& tc : transformConstraints)
+    for (auto& constraint : transformConstraints)
     {
-        for (auto i = m_updateCache.rbegin(); i != m_updateCache.rend(); ++i)
+        sortBone(*constraint.target);
+
+        auto& constrained = constraint.bones;
+        for (auto bone : constrained)
         {
-            auto updatable = i->data;
-            if (updatable == tc.bone)
-            {
-                m_updateCache.emplace(i.base(), tc);
-                break;
-            }
+            sortBone(*bone);
         }
+
+        m_updateCache.emplace_back(constraint);
+
+        for (auto bone : constrained)
+        {
+            sortReset(bone->children);
+        }
+
+        for (auto bone : constrained)
+        {
+            bone->sorted = true;
+        }
+    }
+
+    for (auto& bone : bones)
+    {
+        sortBone(bone);
     }
 }
 
@@ -142,6 +287,9 @@ void Skeleton::updateWorldTransform()
             break;
         case UpdateCacheType::IkConstraint:
             reinterpret_cast<IkConstraint*>(c.data)->apply();
+            break;
+        case UpdateCacheType::PathConstraint:
+            reinterpret_cast<PathConstraint*>(c.data)->apply();
             break;
         case UpdateCacheType::TransformConstraint:
             reinterpret_cast<TransformConstraint*>(c.data)->apply();
@@ -175,6 +323,14 @@ void Skeleton::setBonesToSetupPose()
         tc.translateMix = tc.data.translateMix;
         tc.scaleMix = tc.data.scaleMix;
         tc.shearMix = tc.data.shearMix;
+    }
+
+    for (auto& pc : pathConstraints)
+    {
+        pc.position = pc.data.position;
+        pc.spacing = pc.data.spacing;
+        pc.rotateMix = pc.data.rotateMix;
+        pc.translateMix = pc.data.translateMix;
     }
 }
 
@@ -381,6 +537,11 @@ const IkConstraint* Skeleton::findIkConstraint(const std::string& name) const
 const TransformConstraint* Skeleton::findTransformConstraint(const std::string& name) const
 {
     return findByName(transformConstraints, name);
+}
+
+const PathConstraint* Skeleton::findPathConstraint(const std::string& name) const
+{
+    return findByName(pathConstraints, name);
 }
 
 void Skeleton::update(float deltaTime)

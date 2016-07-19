@@ -31,74 +31,52 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <spinecpp/BoneData.h>
-#include <vector>
+#include <spinecpp/PathConstraintData.h>
+#include <spinecpp/Vector.h>
+
+#include <array>
 
 namespace spine
 {
 
+struct Bone;
+class Slot;
 class Skeleton;
+class PathAttachment;
 
-struct Bone
+class PathConstraint
 {
 public:
-    static void setYDown(bool yDown);
-    static bool isYDown();
-
-    Bone(const BoneData& data, const Skeleton& skeleton, Bone* parent);
+    PathConstraint(const PathConstraintData& data, Skeleton& skeleton);
 
     const std::string& getName() const { return data.name; }
 
-    void setToSetupPose();
-    void updateWorldTransform();
-    void updateWorldTransformWith(Vector translation, float rotation, Vector scale, Vector shear);
+    void apply();
+    
+    const PathConstraintData& data;
+    std::vector<Bone*> bones;
+    const Slot* target;
+    float position, spacing, rotateMix, translateMix;
 
-    float getWorldRotationX() const;
-    float getWorldRotationY() const;
-    float getWorldScaleX() const;
-    float getWorldScaleY() const;
+    std::vector<float> spaces;
 
-    float worldToLocalRotationX() const;
-    float worldToLocalRotationY() const;
+    struct PositionData
+    {
+        Vector position;
+        float data; // different things depending on the type of constraint
+    };
+    std::vector<PositionData> positions;
+    std::vector<Vector> world;
+    std::vector<float> curves;
+    std::vector<float> lengths;
 
-    void rotateWorld(float degrees);
-    void updateLocalTransform();
-
-    void worldToLocal(Vector world, Vector& outLocal);
-    void localToWorld(Vector local, Vector& outWorld);
-
-    bool isRoot() const { return !parent; }
-
-    // links
-    const BoneData& data;
-    const Skeleton& skeleton;
-    Bone* const parent;
-    std::vector<Bone*> children;
-
-    // Logical data
-
-    // user data
-    Vector translation;
-    float rotation;
-    Vector scale;
-    Vector shear;
-
-    float appliedRotation;
-
-    // Physical data
-
-    // world tranform 2x2 matrix
-    float a, b;
-    float c, d;
-
-    Vector worldPos;
-    Vector worldSign;
-
-    // Internal data
-    int/*bool*/ sorted;
+    std::array<float, 10> segments;
 
 private:
-    static bool m_isYDown;
+    void computeWorldPositions();
+    void addBeforePosition(float pos, int o);
+    void addAfterPosition(float pos, int i, int o);
+    void addCurvePosition(float p, float x1, float y1, float cx1, float cy1, float cx2, float cy2, float x2, float y2, bool tangents, int o);
 };
 
 }

@@ -38,6 +38,7 @@
 #include <spinecpp/Animation.h>
 #include <spinecpp/IkConstraintData.h>
 #include <spinecpp/TransformConstraintData.h>
+#include <spinecpp/PathConstraintData.h>
 
 namespace spine
 {
@@ -57,6 +58,7 @@ struct SkeletonData
     std::vector<Animation> animations;
     std::vector<IkConstraintData> ikConstraints;
     std::vector<TransformConstraintData> transformConstraints;
+    std::vector<PathConstraintData> pathConstraints;
 
     const BoneData* findBone(const char* boneName) const;
     int findBoneIndex(const char* boneName) const;
@@ -75,6 +77,9 @@ struct SkeletonData
 
     const TransformConstraintData* findTransformConstraint(const char* constraintName) const;
     int findTransformConstraintIndex(const char* constraintName) const;
+
+    const PathConstraintData* findPathConstraint(const char* constraintName) const;
+    int findPathConstraintIndex(const char* constraintName) const;
 };
 
 }

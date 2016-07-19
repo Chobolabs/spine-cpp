@@ -63,6 +63,7 @@ public:
 
 private:
     friend class SkeletonJson;
+    friend class Skeleton;
 
     struct SkinEntry
     {

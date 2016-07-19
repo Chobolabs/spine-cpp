@@ -45,7 +45,7 @@ class Attachment;
 class Slot
 {
 public:
-    Slot(const SlotData& data, const Bone& bone);
+    Slot(const SlotData& data, Bone& bone);
 
     const std::string& getName() const { return data.name; }
 
@@ -59,7 +59,7 @@ public:
     void setToSetupPose();
 
     const SlotData& data;
-    const Bone& bone;
+    Bone& bone;
     Color color;
     std::vector<Vector> attachmentVertices;
 

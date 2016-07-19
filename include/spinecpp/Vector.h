@@ -31,6 +31,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <cmath>
+
 namespace spine
 {
 
@@ -75,6 +77,16 @@ struct Vector
         x /= f;
         y /= f;
         return *this;
+    }
+
+    float length() const
+    {
+        return std::sqrt(x*x + y*y);
+    }
+
+    float angle() const
+    {
+        return std::atan2(y, x);
     }
 
     float x, y;

@@ -48,11 +48,13 @@ enum class BlendMode
 
 struct SlotData
 {
-    SlotData(const std::string& name, const BoneData* boneData)
-        : name(name)
+    SlotData(int index, const std::string& name, const BoneData* boneData)
+        : index(index)
+        , name(name)
         , boneData(boneData)
     {}
 
+    const int index;
     const std::string name;
     const BoneData* const boneData;
     std::string attachmentName;

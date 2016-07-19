@@ -125,8 +125,8 @@ void SkeletonBounds::update(const Skeleton& skeleton, bool updateAabb)
         auto bb = static_cast<const BoundingBoxAttachment*>(attachment);
         bounds.boundingBox = bb;
 
-        bounds.polygon.vertices.resize(bb->getVerticesCount());
-        bb->computeWorldVertices(slot.bone, reinterpret_cast<float*>(bounds.polygon.vertices.data()));
+        bounds.polygon.vertices.resize(bb->worldVerticesCount);
+        bb->computeWorldVertices(slot, reinterpret_cast<float*>(bounds.polygon.vertices.data()));
 
         if (updateAabb)
         {

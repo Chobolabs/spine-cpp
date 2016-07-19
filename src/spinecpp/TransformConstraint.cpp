@@ -47,66 +47,73 @@ TransformConstraint::TransformConstraint(const TransformConstraintData& data, Sk
     scaleMix = data.scaleMix;
     shearMix = data.shearMix;
 
-    offsetRotation = data.offsetRotation;
-    offsetTranslation = data.offsetTranslation;
-    offsetScale = data.offsetScale;
-    offsetShearY = data.offsetShearY;
+    bones.reserve(data.bones.size());
+    for (auto boneData : data.bones)
+    {
+        bones.emplace_back(skeleton.findBone(boneData->name));
+    }
 
-    bone = skeleton.findBone(data.bone->name);
     target = skeleton.findBone(data.target->name);
 }
 
 void TransformConstraint::apply()
 {
-    if (rotateMix > 0) {
-        float a = bone->a, b = bone->b, c = bone->c, d = bone->d;
-        float r = atan2(target->c, target->a) - atan2(c, a) + offsetRotation * DEG_RAD;
-        if (r > PI)
-            r -= PI_DBL;
-        else if (r < -PI) r += PI_DBL;
-        r *= rotateMix;
-        float cosine = cos(r); 
-        float sine = sin(r);
-        bone->a = cosine * a - sine * c;
-        bone->b = cosine * b - sine * d;
-        bone->c = sine * a + cosine * c;
-        bone->d = sine * b + cosine * d;
-    }
+    float ta = target->a, tb = target->b, tc = target->c, td = target->d;
 
-    if (translateMix > 0)
+    for (auto bone : bones)
     {
-        Vector w;
-        target->localToWorld(offsetTranslation, w);
+        if (rotateMix > 0)
+        {
+            float a = bone->a, b = bone->b, c = bone->c, d = bone->d;
+            float r = atan2(tc, ta) - atan2(c, a) + data.offsetRotation * DEG_RAD;
 
-        bone->worldPos.x += (w.x - bone->worldPos.x) * translateMix;
-        bone->worldPos.y += (w.y - bone->worldPos.y) * translateMix;
-    }
+            if (r > PI) r -= PI_DBL;
+            else if (r < -PI) r += PI_DBL;
+            r *= rotateMix;
+            float cosine = cos(r);
+            float sine = sin(r);
+            bone->a = cosine * a - sine * c;
+            bone->b = cosine * b - sine * d;
+            bone->c = sine * a + cosine * c;
+            bone->d = sine * b + cosine * d;
+        }
 
-    if (scaleMix > 0) {
-        float bs = sqrt(bone->a * bone->a + bone->c * bone->c);
-        float ts = sqrt(target->a * target->a + target->c * target->c);
-        float s = bs > 0.00001f ? (bs + (ts - bs + offsetScale.x) * scaleMix) / bs : 0;
-        bone->a *= s;
-        bone->c *= s;
-        bs = sqrt(bone->b * bone->b + bone->d * bone->d);
-        ts = sqrt(target->b * target->b + target->d * target->d);
-        s = bs > 0.00001f ? (bs + (ts - bs + offsetScale.y) * scaleMix) / bs : 0;
-        bone->b *= s;
-        bone->d *= s;
-    }
+        if (translateMix > 0)
+        {
+            Vector pos;
+            target->localToWorld(data.offsetTranslation, pos);
 
-    if (shearMix > 0) {
-        float b = bone->b, d = bone->d;
-        float by = atan2(d, b);
-        float r = atan2(target->d, target->b) - atan2(target->c, target->a) - (by - atan2(bone->c, bone->a));
-        float s;
-        if (r > PI)
-            r -= PI_DBL;
-        else if (r < -PI) r += PI_DBL;
-        r = by + (r + offsetShearY * DEG_RAD) * shearMix;
-        s = sqrt(b * b + d * d);
-        bone->b = cos(r) * s;
-        bone->d = sin(r) * s;
+            bone->worldPos += (pos - bone->worldPos) * translateMix;
+        }
+
+        if (scaleMix > 0)
+        {
+            float bs = sqrt(bone->a * bone->a + bone->c * bone->c);
+            float ts = sqrt(ta * ta + tc * tc);
+            float s = bs > 0.00001f ? (bs + (ts - bs + data.offsetScale.x) * scaleMix) / bs : 0;
+            bone->a *= s;
+            bone->c *= s;
+
+            bs = sqrt(bone->b * bone->b + bone->d * bone->d);
+            ts = sqrt(tb * tb + td * td);
+            s = bs > 0.00001f ? (bs + (ts - bs + data.offsetScale.y) * scaleMix) / bs : 0;
+            bone->b *= s;
+            bone->d *= s;
+        }
+
+        if (shearMix > 0)
+        {
+            float b = bone->b, d = bone->d;
+            float by = atan2(d, b);
+            float r = atan2(td, tb) - atan2(tc, ta) - (by - atan2(bone->c, bone->a));
+            float s = sqrt(b * b + d * d);
+
+            if (r > PI) r -= PI_DBL;
+            else if (r < -PI) r += PI_DBL;
+            r = by + (r + data.offsetShearY * DEG_RAD) * shearMix;
+            bone->b = cos(r) * s;
+            bone->d = sin(r) * s;
+        }
     }
 }
 

@@ -36,6 +36,7 @@
 #include "Skin.h"
 #include "IkConstraint.h"
 #include "TransformConstraint.h"
+#include "PathConstraint.h"
 
 namespace spine
 {
@@ -45,7 +46,8 @@ class Skeleton
 public:
     Skeleton(const SkeletonData& data);
 
-    /* Caches information about bones and constraints. Must be called if bones or constraints are added or removed. */
+    /* Caches information about bones and constraints. Must be called if bones or constraints, or weighted path attachments
+    * are added or removed. */
     void updateCache();
     void updateWorldTransform();
 
@@ -100,6 +102,8 @@ public:
     /* Returns 0 if the transform constraint was not found. */
     const TransformConstraint* findTransformConstraint(const std::string& name) const;
 
+    const PathConstraint* findPathConstraint(const std::string& name) const;
+
     void update(float deltaTime);
 
     const SkeletonData& data;
@@ -110,8 +114,11 @@ public:
     std::vector<Slot*> drawOrder; // pointers from to m_slots
 
     std::vector<IkConstraint> ikConstraints;
+    std::vector<IkConstraint*> ikConstraintsSorted;
 
     std::vector<TransformConstraint> transformConstraints;
+
+    std::vector<PathConstraint> pathConstraints;
 
     Color color;
 
@@ -127,8 +134,14 @@ private:
     {
         Bone,
         IkConstraint,
+        PathConstraint,
         TransformConstraint,
     };
+
+    void sortBone(Bone& b);
+    void sortReset(std::vector<Bone*>& bones);
+    void sortPathConstraintAttachment(const Skin& skin, int slotIndex, Bone& slotBone);
+    void sortPathConstraintAttachmentBones(const Attachment* attachment, Bone& slotBone);
 
     struct UpdateCacheElem
     {
@@ -142,6 +155,10 @@ private:
             , type(UpdateCacheType::IkConstraint)
         {}
 
+        UpdateCacheElem(PathConstraint& p)
+            : data(&p)
+            , type(UpdateCacheType::PathConstraint)
+        {}
 
         UpdateCacheElem(TransformConstraint& t)
             : data(&t)

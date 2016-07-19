@@ -38,7 +38,7 @@
 namespace spine
 {
 
-Slot::Slot(const SlotData& data, const Bone& bone)
+Slot::Slot(const SlotData& data, Bone& bone)
     : data(data)
     , bone(bone)
 {
@@ -77,11 +77,8 @@ void Slot::setToSetupPose()
     }
     else
     {
-        // Hacky find slot index assuming that we're a part of the skeleto
-        int i = int(this - bone.skeleton.slots.data());
-
         m_attachment = nullptr;
-        auto attachment = bone.skeleton.getAttachmentForSlotIndex(i, data.attachmentName);
+        auto attachment = bone.skeleton.getAttachmentForSlotIndex(data.index, data.attachmentName);
         setAttachment(attachment);
     }
 }

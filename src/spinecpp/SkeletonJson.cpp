@@ -36,7 +36,7 @@
 #include <spinecpp/AtlasAttachmentLoader.h>
 #include <spinecpp/RegionAttachment.h>
 #include <spinecpp/MeshAttachment.h>
-#include <spinecpp/WeightedMeshAttachment.h>
+#include <spinecpp/PathAttachment.h>
 #include <spinecpp/BoundingBoxAttachment.h>
 #include <spinecpp/Timelines.h>
 #include <spinecpp/Event.h>
@@ -163,7 +163,7 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
             }
 
             string boneName = jbone.get_safe_value_of_key_as_string(literal("name"));
-            skeletonData->bones.emplace_back(boneName, parent);
+            skeletonData->bones.emplace_back(int(i), boneName, parent);
             auto& bone = skeletonData->bones.back();
 
             bone.length = jbone.get_safe_float_value_of_key(literal("length")) * m_scale;
@@ -174,9 +174,59 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
             bone.scale.y = jbone.get_safe_float_value_of_key(literal("scaleY"), 1);
             bone.shear.x = jbone.get_safe_float_value_of_key(literal("shearY"));
             bone.shear.y = jbone.get_safe_float_value_of_key(literal("shearY"));
-            bone.inheritScale = !!jbone.get_safe_integer_value_of_key(literal("inheritScale"), 1);
             bone.inheritRotation = !!jbone.get_safe_integer_value_of_key(literal("inheritRotation"), 1);
+            bone.inheritScale = !!jbone.get_safe_integer_value_of_key(literal("inheritScale"), 1);
             // no color...
+        }
+    }
+    
+    /* Slots. */
+    const auto islots = root.find_object_key(literal("slots"));
+    if (islots < len)
+    {
+        const auto& jslots = root.get_object_value(islots);
+        const auto numSlots = jslots.get_length();
+
+        skeletonData->slots.reserve(numSlots);
+
+        for (size_t i = 0; i < numSlots; ++i)
+        {
+            const auto& jslot = jslots.get_array_element(i);
+
+            // bone
+            const char* boneName = jslot.get_safe_string_value_of_key(literal("bone"));
+            auto bone = skeletonData->findBone(boneName);
+            if (!bone)
+            {
+                setError("Slot bone not found: ", boneName);
+                return nullptr;
+            }
+
+            string slotName = jslot.get_safe_value_of_key_as_string(literal("name"));
+            skeletonData->slots.emplace_back(int(i), slotName, bone);
+            auto& slot = skeletonData->slots.back();
+
+            string color = jslot.get_safe_value_of_key_as_string(literal("color"));
+            slot.color = Color_fromHexString(color);
+
+            slot.attachmentName = jslot.get_safe_value_of_key_as_string(literal("attachment"));
+
+            string blendStr = jslot.get_safe_value_of_key_as_string(literal("blend"));
+            if (!blendStr.empty())
+            {
+                if (blendStr == "additive")
+                {
+                    slot.blendMode = BlendMode::Additive;
+                }
+                else if (blendStr == "multiply")
+                {
+                    slot.blendMode = BlendMode::Multiply;
+                }
+                else if (blendStr == "screen")
+                {
+                    slot.blendMode = BlendMode::Screen;
+                }
+            }
         }
     }
 
@@ -253,15 +303,20 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
             skeletonData->transformConstraints.emplace_back(transformName);
             auto& transform = skeletonData->transformConstraints.back();
 
-            // bone
-            const char* boneName = jtransform.get_safe_string_value_of_key(literal("bone"));
-            auto bone = skeletonData->findBone(boneName);
-            if (!bone)
+            // bones
+            const auto& jbones = jtransform.get_value_of_key(literal("bones"));
+            transform.bones.resize(jbones.get_length());
+            for (size_t b = 0; b < jbones.get_length(); ++b)
             {
-                setError("Transform constraint bone not found: ", boneName);
-                return nullptr;
+                const char* boneName = jbones.get_array_element(b).get_string_value();
+                auto bone = skeletonData->findBone(boneName);
+                if (!bone)
+                {
+                    setError("Transform bone not found: ", boneName);
+                    return nullptr;
+                }
+                transform.bones[b] = bone;
             }
-            transform.bone = bone;
 
             // target
             const char* targetBoneName = jtransform.get_safe_string_value_of_key(literal("target"));
@@ -287,53 +342,69 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
         }
     }
 
-    /* Slots. */
-    const auto islots = root.find_object_key(literal("slots"));
-    if (islots < len)
+    /* Path constraints */
+    const auto ipaths = root.find_object_key(literal("path"));
+    if (ipaths < len)
     {
-        const auto& jslots = root.get_object_value(islots);
-        const auto numSlots = jslots.get_length();
+        const auto& jpaths = root.get_object_value(ipaths);
+        const auto numPaths = jpaths.get_length();
 
-        skeletonData->slots.reserve(numSlots);
+        skeletonData->pathConstraints.reserve(numPaths);
 
-        for (size_t i = 0; i < numSlots; ++i)
+        for (size_t i = 0; i < numPaths; ++i)
         {
-            const auto& jslot = jslots.get_array_element(i);
+            const auto& jpath = jpaths.get_array_element(i);
+            string pathName = jpath.get_safe_value_of_key_as_string(literal("name"));
+            skeletonData->pathConstraints.emplace_back(pathName);
+            auto& path = skeletonData->pathConstraints.back();
 
-            // bone
-            const char* boneName = jslot.get_safe_string_value_of_key(literal("bone"));
-            auto bone = skeletonData->findBone(boneName);
-            if (!bone)
+            auto ibones = jpath.find_object_key(literal("bones"));
+            if (ibones < jpath.get_length())
             {
-                setError("Slot bone not found: ", boneName);
+                const auto& jbones = jpath.get_object_value(ibones);
+                path.bones.resize(jbones.get_length());
+                for (size_t b = 0; b < jbones.get_length(); ++b)
+                {
+                    const char* boneName = jbones.get_array_element(b).get_string_value();
+                    auto bone = skeletonData->findBone(boneName);
+                    if (!bone)
+                    {
+                        setError("Path bone not found: ", boneName);
+                        return nullptr;
+                    }
+                    path.bones[b] = bone;
+                }
+            }
+
+            const char* targetName = jpath.get_safe_string_value_of_key(literal("target"));
+            path.target = skeletonData->findSlot(targetName);
+            if (!path.target)
+            {
+                setError("Path target slot not found: ", targetName);
                 return nullptr;
             }
 
-            string slotName = jslot.get_safe_value_of_key_as_string(literal("name"));
-            skeletonData->slots.emplace_back(slotName, bone);
-            auto& slot = skeletonData->slots.back();
+            const char* mode = jpath.get_safe_string_value_of_key(literal("positionMode"), "percent");
+            if (strcmp(mode, "fixed") == 0) path.positionMode = PositionMode::Fixed;
+            else if (strcmp(mode, "percent") == 0) path.positionMode = PositionMode::Percent;
 
-            string color = jslot.get_safe_value_of_key_as_string(literal("color"));
-            slot.color = Color_fromHexString(color);
+            mode = jpath.get_safe_string_value_of_key(literal("spacingMode"), "length");
+            if (strcmp(mode, "length") == 0) path.spacingMode = SpacingMode::Length;
+            else if (strcmp(mode, "fixed") == 0) path.spacingMode = SpacingMode::Fixed;
+            else if (strcmp(mode, "percent") == 0) path.spacingMode = SpacingMode::Percent;
 
-            slot.attachmentName = jslot.get_safe_value_of_key_as_string(literal("attachment"));
+            mode = jpath.get_safe_string_value_of_key(literal("rotateMode"), "tangent");
+            if (strcmp(mode, "tangent") == 0) path.rotateMode = RotateMode::Tangent;
+            else if (strcmp(mode, "chain") == 0) path.rotateMode = RotateMode::Chain;
+            else if (strcmp(mode, "chainScale") == 0) path.rotateMode = RotateMode::ChainScale;
 
-            string blendStr = jslot.get_safe_value_of_key_as_string(literal("blend"));
-            if (!blendStr.empty())
-            {
-                if (blendStr == "additive")
-                {
-                    slot.blendMode = BlendMode::Additive;
-                }
-                else if (blendStr == "multiply")
-                {
-                    slot.blendMode = BlendMode::Multiply;
-                }
-                else if (blendStr == "screen")
-                {
-                    slot.blendMode = BlendMode::Screen;
-                }
-            }
+            path.offsetRotation = jpath.get_safe_float_value_of_key(literal("rotation"), 0);
+            path.position = jpath.get_safe_float_value_of_key(literal("position"), 0);
+            if (path.positionMode == PositionMode::Fixed) path.position *= m_scale;
+            path.spacing = jpath.get_safe_float_value_of_key(literal("spacing"), 0);
+            if (path.spacingMode == SpacingMode::Length || path.spacingMode == SpacingMode::Fixed) path.spacing *= m_scale;
+            path.rotateMix = jpath.get_safe_float_value_of_key(literal("rotateMix"), 1);
+            path.translateMix = jpath.get_safe_float_value_of_key(literal("translateMix"), 1);
         }
     }
 
@@ -386,21 +457,17 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
                     {
                         type = Attachment::Type::Mesh;
                     }
-                    else if (strcmp(stype, "weightedmesh") == 0 || /*backwards compatibility*/strcmp(stype, "skinnedmesh") == 0)
-                    {
-                        type = Attachment::Type::WeightedMesh;
-                    }
                     else if (strcmp(stype, "linkedmesh") == 0)
                     {
                         type = Attachment::Type::LinkedMesh;
                     }
-                    else if (strcmp(stype, "weightedlinkedmesh") == 0)
-                    {
-                        type = Attachment::Type::WeightedLinkedMesh;
-                    }
                     else if (strcmp(stype, "boundingbox") == 0)
                     {
                         type = Attachment::Type::BoundingBox;
+                    }
+                    else if (strcmp(stype, "path") == 0)
+                    {
+                        type = Attachment::Type::Path;
                     }
                     else
                     {
@@ -455,17 +522,6 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
                         auto iparent = jattachment.find_object_key(literal("parent"));
                         if (iparent == jattachment.get_length())
                         {
-                            const auto& jvertices = jattachment.get_value_of_key(literal("vertices"));
-                            auto numVertices = jvertices.get_length();
-                            mesh->vertices.reserve(numVertices);
-                            for (size_t v = 0; v < numVertices; v += 2)
-                            {
-                                float x = jvertices.get_array_element(v).get_safe_float_value() * m_scale;
-                                float y = jvertices.get_array_element(v + 1).get_safe_float_value() * m_scale;
-
-                                mesh->vertices.emplace_back(x, y);
-                            }
-
                             const auto& jtriangles = jattachment.get_value_of_key(literal("triangles"));
                             auto numTriangles = jtriangles.get_length();
                             mesh->triangles.resize(numTriangles);
@@ -476,7 +532,7 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
 
                             const auto& juvs = jattachment.get_value_of_key(literal("uvs"));
                             auto numUVs = juvs.get_length();
-                            mesh->regionUVs.reserve(numUVs);
+                            mesh->regionUVs.reserve(numUVs / 2);
                             for (size_t uv = 0; uv < numUVs; uv += 2)
                             {
                                 float x = juvs.get_array_element(uv).get_safe_float_value();
@@ -484,6 +540,8 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
 
                                 mesh->regionUVs.emplace_back(x, y);
                             }
+
+                            readVertices(jattachment, *mesh, int(numUVs));
 
                             mesh->updateUVs();
 
@@ -504,101 +562,7 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
                         }
                         else
                         {
-                            mesh->inheritFFD = !!jattachment.get_safe_integer_value_of_key(literal("ffd"), 1);
-                            const char* skin = jattachment.get_safe_string_value_of_key(literal("skin"));
-                            const auto& jparent = jattachment.get_object_value(iparent);
-                            const char* parent = jparent.get_string_value();
-                            m_linkedMeshes.emplace_back(mesh, skin, slotIndex, parent);
-                        }
-                    }
-                    break;
-                    case Attachment::Type::WeightedMesh:
-                    case Attachment::Type::WeightedLinkedMesh:
-                    {
-                        auto mesh = static_cast<WeightedMeshAttachment*>(attachment);
-
-                        string color = jattachment.get_safe_value_of_key_as_string(literal("color"));
-                        mesh->color = Color_fromHexString(color);
-
-                        mesh->size.x = jattachment.get_safe_float_value_of_key(literal("width"), 32) * m_scale;
-                        mesh->size.y = jattachment.get_safe_float_value_of_key(literal("height"), 32) * m_scale;
-
-                        auto iparent = jattachment.find_object_key(literal("parent"));
-                        if (iparent == jattachment.get_length())
-                        {
-
-
-                            const auto& juvs = jattachment.get_value_of_key(literal("uvs"));
-                            auto numUVs = juvs.get_length();
-                            mesh->regionUVs.reserve(numUVs);
-                            for (size_t uv = 0; uv < numUVs; uv += 2)
-                            {
-                                float x = juvs.get_array_element(uv).get_safe_float_value();
-                                float y = juvs.get_array_element(uv + 1).get_safe_float_value();
-
-                                mesh->regionUVs.emplace_back(x, y);
-                            }
-
-                            const auto& jvertices = jattachment.get_value_of_key(literal("vertices"));
-                            auto numVertices = jvertices.get_length();
-
-                            size_t numBones = 0;
-                            size_t numWeights = 0;
-                            for (size_t v = 0; v < numVertices;)
-                            {
-                                int bc = jvertices.get_array_element(v).get_integer_value();
-                                numBones += bc + 1;
-                                numWeights += 3 * bc;
-                                v += 1 + bc * 4;
-                            }
-
-                            mesh->bones.resize(numBones);
-                            mesh->weights.resize(numWeights);
-
-                            int b = 0;
-                            int w = 0;
-                            for (size_t v = 0; v < numVertices;)
-                            {
-                                int bc = jvertices.get_array_element(v++).get_integer_value();
-                                mesh->bones[b++] = bc;
-                                for (int ib = 0; ib < bc; ++ib)
-                                {
-                                    mesh->bones[b++] = jvertices.get_array_element(v).get_integer_value();
-                                    mesh->weights[w++] = jvertices.get_array_element(v + 1).get_safe_float_value() * m_scale;
-                                    mesh->weights[w++] = jvertices.get_array_element(v + 2).get_safe_float_value() * m_scale;
-                                    mesh->weights[w++] = jvertices.get_array_element(v + 3).get_safe_float_value();
-                                    v += 4;
-                                }
-                            }
-
-                            const auto& jtriangles = jattachment.get_value_of_key(literal("triangles"));
-                            auto numTriangles = jtriangles.get_length();
-                            mesh->triangles.resize(numTriangles);
-                            for (size_t t = 0; t < numTriangles; ++t)
-                            {
-                                mesh->triangles[t] = jtriangles.get_array_element(t).get_integer_value();
-                            }
-
-                            mesh->updateUVs();
-
-                            mesh->hullLength = jattachment.get_safe_integer_value_of_key(literal("hull"));
-
-                            auto iedges = jattachment.find_object_key(literal("edges"));
-                            if (iedges < jattachment.get_length())
-                            {
-                                const auto& jedges = jattachment.get_object_value(iedges);
-                                mesh->edges.resize(jedges.get_length());
-                                for (size_t e = 0; e < mesh->edges.size(); ++e)
-                                {
-                                    mesh->edges[e] = jedges.get_array_element(e).get_integer_value();
-                                }
-                            }
-
-                            m_loader->configureAttachment(mesh);
-                        }
-                        else
-                        {
-                            mesh->inheritFFD = !!jattachment.get_safe_integer_value_of_key(literal("ffd"), 1);
+                            mesh->inheritDeform = !!jattachment.get_safe_integer_value_of_key(literal("deform"), 1);
                             const char* skin = jattachment.get_safe_string_value_of_key(literal("skin"));
                             const auto& jparent = jattachment.get_object_value(iparent);
                             const char* parent = jparent.get_string_value();
@@ -610,18 +574,29 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
                     {
                         auto bbox = static_cast<BoundingBoxAttachment*>(attachment);
 
-                        const auto& jvertices = jattachment.get_value_of_key(literal("vertices"));
-                        auto numVertices = jvertices.get_length();
-                        bbox->vertices.reserve(numVertices);
-                        for (size_t v = 0; v < numVertices; v += 2)
-                        {
-                            float x = jvertices.get_array_element(v).get_safe_float_value() * m_scale;
-                            float y = jvertices.get_array_element(v + 1).get_safe_float_value() * m_scale;
-
-                            bbox->vertices.emplace_back(x, y);
-                        }
+                        int vertexCount = jattachment.get_safe_integer_value_of_key(literal("vertexCount"));
+                        readVertices(jattachment, *bbox, 2 * vertexCount);
 
                         m_loader->configureAttachment(bbox);
+                    }
+                    break;
+                    case Attachment::Type::Path:
+                    {
+                        auto path = static_cast<PathAttachment*>(attachment);
+
+                        path->closed = jattachment.get_safe_integer_value_of_key(literal("closed"));
+                        path->constantSpeed = jattachment.get_safe_integer_value_of_key(literal("constantSpeed"), 1);
+                        int vertexCount = jattachment.get_safe_integer_value_of_key(literal("vertexCount"));
+                        readVertices(jattachment, *path, 2 * vertexCount);
+
+                        path->lengths.resize(vertexCount / 3);
+
+                        auto ilengths = jattachment.find_object_key(literal("lengths"));
+                        const auto& jlengths = jattachment.get_object_value(ilengths);
+                        for (size_t l = 0; l < path->lengths.size(); ++l)
+                        {
+                            path->lengths[l] = jlengths.get_array_element(l).get_safe_float_value() * m_scale;
+                        }
                     }
                     break;
                     }
@@ -649,18 +624,8 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
             return nullptr;
         }
 
-        if (linkedMesh.mesh->type == Attachment::Type::Mesh)
-        {
-            auto mesh = static_cast<MeshAttachment*>(linkedMesh.mesh);
-            mesh->setParentMesh(static_cast<const MeshAttachment*>(parent));
-            mesh->updateUVs();
-        }
-        else
-        {
-            auto mesh = static_cast<WeightedMeshAttachment*>(linkedMesh.mesh);
-            mesh->setParentMesh(static_cast<const WeightedMeshAttachment*>(parent));
-            mesh->updateUVs();
-        }
+        linkedMesh.mesh->setParentMesh(static_cast<const MeshAttachment*>(parent));
+        linkedMesh.mesh->updateUVs();
 
         m_loader->configureAttachment(linkedMesh.mesh);
     }
@@ -725,7 +690,8 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
     auto islots = json.find_object_key(literal("slots"));
     auto iik = json.find_object_key(literal("ik"));
     auto itransform = json.find_object_key(literal("transform"));
-    auto iffd = json.find_object_key(literal("ffd"));
+    auto ipaths = json.find_object_key(literal("paths"));
+    auto ideform = json.find_object_key(literal("deform"));
 
     auto idrawOrder = json.find_object_key(literal("drawOrder"));
     if (idrawOrder >= len)
@@ -761,12 +727,26 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
         numTimelines += json.get_object_value(iik).get_length();
     }
 
-    if (iffd < len)
+    if (itransform < len)
     {
-        const auto& jffd = json.get_object_value(iffd);
-        for (size_t s = 0; s < jffd.get_length(); ++s)
+        numTimelines += json.get_object_value(itransform).get_length();
+    }
+
+    if (ipaths < len)
+    {
+        const auto& jpaths = json.get_object_value(ipaths);
+        for (size_t i = 0; i < jpaths.get_length(); ++i)
         {
-            const auto& jslots = jffd.get_object_value(s);
+            numTimelines += jpaths.get_object_value(i).get_length();
+        }
+    }
+
+    if (ideform < len)
+    {
+        const auto& jdeform = json.get_object_value(ideform);
+        for (size_t s = 0; s < jdeform.get_length(); ++s)
+        {
+            const auto& jslots = jdeform.get_object_value(s);
             for (size_t i = 0; i < jslots.get_length(); ++i)
             {
                 numTimelines += jslots.get_object_value(i).get_length();
@@ -817,11 +797,7 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
                     }
 
                     anim.timelines.emplace_back(timeline);
-                    float duration = timeline->frames.back().time;
-                    if (duration > anim.duration)
-                    {
-                        anim.duration = duration;
-                    }
+                    anim.duration = std::max(anim.duration, timeline->frames.back().time);
                 }
                 else if (strcmp(timelineTypeName, "attachment") == 0)
                 {
@@ -846,11 +822,7 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
                     }
 
                     anim.timelines.emplace_back(timeline);
-                    float duration = timeline->frames.back().time;
-                    if (duration > anim.duration)
-                    {
-                        anim.duration = duration;
-                    }
+                    anim.duration = std::max(anim.duration, timeline->frames.back().time);
                 }
                 else
                 {
@@ -898,11 +870,7 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
                     }
 
                     anim.timelines.emplace_back(timeline);
-                    float duration = timeline->frames.back().time;
-                    if (duration > anim.duration)
-                    {
-                        anim.duration = duration;
-                    }
+                    anim.duration = std::max(anim.duration, timeline->frames.back().time);
                 }
                 else if (strcmp(timelineTypeName, "scale") == 0)
                 {
@@ -922,11 +890,7 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
                     }
 
                     anim.timelines.emplace_back(timeline);
-                    float duration = timeline->frames.back().time;
-                    if (duration > anim.duration)
-                    {
-                        anim.duration = duration;
-                    }
+                    anim.duration = std::max(anim.duration, timeline->frames.back().time);
                 }
                 else if (strcmp(timelineTypeName, "translate") == 0)
                 {
@@ -946,11 +910,7 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
                     }
 
                     anim.timelines.emplace_back(timeline);
-                    float duration = timeline->frames.back().time;
-                    if (duration > anim.duration)
-                    {
-                        anim.duration = duration;
-                    }
+                    anim.duration = std::max(anim.duration, timeline->frames.back().time);
                 }
                 else if (strcmp(timelineTypeName, "shear") == 0)
                 {
@@ -970,11 +930,7 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
                     }
 
                     anim.timelines.emplace_back(timeline);
-                    float duration = timeline->frames.back().time;
-                    if (duration > anim.duration)
-                    {
-                        anim.duration = duration;
-                    }
+                    anim.duration = std::max(anim.duration, timeline->frames.back().time);
                 }
                 else
                 {
@@ -1012,11 +968,7 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
             }
 
             anim.timelines.emplace_back(timeline);
-            float duration = timeline->frames.back().time;
-            if (duration > anim.duration)
-            {
-                anim.duration = duration;
-            }
+            anim.duration = std::max(anim.duration, timeline->frames.back().time);
         }
     }
 
@@ -1045,30 +997,107 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
             }
 
             anim.timelines.emplace_back(timeline);
-            float duration = timeline->frames.back().time;
-            if (duration > anim.duration)
+            anim.duration = std::max(anim.duration, timeline->frames.back().time);
+        }
+    }
+
+    /** Path constraint timelines. */
+    if (ipaths < len)
+    {
+        const auto& jpaths = json.get_object_value(ipaths);
+
+        for (size_t i = 0; i < jpaths.get_length(); ++i)
+        {
+            const auto& jpath = jpaths.get_object_value(i);
+            const char* pathConstraintName = jpaths.get_object_key(i);
+
+            int constraintIndex = skeletonData.findPathConstraintIndex(pathConstraintName);
+
+            if (constraintIndex == -1)
             {
-                anim.duration = duration;
+                setError("Path constraint not found: ", pathConstraintName);
+                return;
+            }
+
+            auto& data = skeletonData.pathConstraints[constraintIndex];
+
+            for (size_t j = 0; j < jpath.get_length(); ++j)
+            {
+                const auto& jtimeline = jpath.get_object_value(j);
+                const char* timelineTypeName = jpath.get_object_key(j);
+
+                if (strcmp(timelineTypeName, "position") == 0 || strcmp(timelineTypeName, "spacing") == 0)
+                {
+                    PathConstraintTimeline* timeline;
+                    float timelineScale = 1;
+
+                    if(strcmp(timelineTypeName, "spacing") == 0)
+                    {
+                        timeline = new PathConstraintSpacingTimeline(int(jtimeline.get_length()));
+                        if (data.spacingMode == SpacingMode::Length || data.spacingMode == SpacingMode::Fixed)
+                        {
+                            timelineScale = m_scale;
+                        }
+                    }
+                    else
+                    {
+                        timeline = new PathConstraintPositionTimeline(int(jtimeline.get_length()));
+                        if (data.positionMode == PositionMode::Fixed)
+                        {
+                            timelineScale = m_scale;
+                        }
+                    }
+
+                    timeline->pathConstraintIndex = constraintIndex;
+
+                    for (size_t f = 0; f < jtimeline.get_length(); ++f)
+                    {
+                        const auto& jframe = jtimeline.get_array_element(f);
+                        timeline->frames[f].time = jframe.get_safe_float_value_of_key(literal("time"));
+                        timeline->frames[f].value = jframe.get_safe_float_value_of_key(literal(timelineTypeName)) * timelineScale;
+                        readCurve(timeline->frames[f], jframe);
+                    }
+
+                    anim.timelines.emplace_back(timeline);
+                    anim.duration = std::max(anim.duration, timeline->frames.back().time);
+                }
+                else if (strcmp(timelineTypeName, "mix") == 0)
+                {
+                    auto timeline = new PathConstraintMixTimeline(int(jtimeline.get_length()));
+                    timeline->pathConstraintIndex = constraintIndex;
+
+                    for (size_t f = 0; f < jtimeline.get_length(); ++f)
+                    {
+                        const auto& jframe = jtimeline.get_array_element(f);
+                        timeline->frames[f].time = jframe.get_safe_float_value_of_key(literal("time"));
+                        timeline->frames[f].rotateMix = jframe.get_safe_float_value_of_key(literal("rotateMix"), 1);
+                        timeline->frames[f].translateMix = jframe.get_safe_float_value_of_key(literal("translateMix"), 1);
+                        readCurve(timeline->frames[f], jframe);
+                    }
+
+                    anim.timelines.emplace_back(timeline);
+                    anim.duration = std::max(anim.duration, timeline->frames.back().time);
+                }
             }
         }
     }
 
-    /* FFD timelines. */
-    if (iffd < len)
+    /* Deform timelines. */
+    if (ideform < len)
     {
-        const auto& jffds = json.get_object_value(iffd);
+        const auto& jdeforms = json.get_object_value(ideform);
 
-        for (size_t i = 0; i < jffds.get_length(); ++i)
+        for (size_t i = 0; i < jdeforms.get_length(); ++i)
         {
-            const auto& jffd = jffds.get_object_value(i);
-            const char* skinName = jffds.get_object_key(i);
+            const auto& jdeform = jdeforms.get_object_value(i);
+            const char* skinName = jdeforms.get_object_key(i);
 
             auto skin = skeletonData.findSkin(skinName);
 
-            for (size_t j = 0; j < jffd.get_length(); ++j)
+            for (size_t j = 0; j < jdeform.get_length(); ++j)
             {
-                const auto& jslot = jffd.get_object_value(j);
-                const char* slotName = jffd.get_object_key(j);
+                const auto& jslot = jdeform.get_object_value(j);
+                const char* slotName = jdeform.get_object_key(j);
 
                 auto slotIndex = skeletonData.findSlotIndex(slotName);
 
@@ -1077,24 +1106,25 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
                     const auto& jtimeline = jslot.get_object_value(t);
                     const char* attachmentName = jslot.get_object_key(t);
 
-                    auto attachment = skin->getAttachment(slotIndex, attachmentName);
+                    auto attachment = static_cast<const VertexAttachment*>(skin->getAttachment(slotIndex, attachmentName));
                     if (!attachment)
                     {
                         setError("Animation ffd skin attachment not found: ", attachmentName);
                         return;
                     }
 
-                    size_t numVertices = 0;
-                    if (attachment->type == Attachment::Type::Mesh)
+                    bool weighted = !attachment->bones.empty();
+                    size_t numVertices = 0;                    
+                    if (weighted)
                     {
-                        numVertices = static_cast<const MeshAttachment*>(attachment)->vertices.size();
+                        numVertices = attachment->vertices.size() / 3;
                     }
-                    else if (attachment->type == Attachment::Type::WeightedMesh)
+                    else
                     {
-                        numVertices = static_cast<const WeightedMeshAttachment*>(attachment)->weights.size() / 3;
+                        numVertices = attachment->vertices.size() / 2;
                     }
 
-                    auto timeline = new FFDTimeline(int(jtimeline.get_length()), numVertices);
+                    auto timeline = new DeformTimeline(int(jtimeline.get_length()), numVertices);
                     timeline->slotIndex = slotIndex;
                     timeline->attachment = attachment;
 
@@ -1109,13 +1139,14 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
                         const auto& ivertices = jframe.find_object_key(literal("vertices"));
                         if (ivertices >= jframe.get_length())
                         {
-                            if (attachment->type == Attachment::Type::Mesh)
+                            if (weighted)
                             {
-                                timeline->setFrame(int(f), time, static_cast<const MeshAttachment*>(attachment)->vertices);
+                                verts.assign(numVertices, Vector(0, 0));
+                                timeline->setFrame(int(f), time, verts);
                             }
                             else
                             {
-                                timeline->setFrame(int(f), time, vector<Vector>(numVertices, Vector(0, 0)));
+                                timeline->setFrame(int(f), time, attachment->vertices.vec());
                             }
                         }
                         else
@@ -1130,12 +1161,12 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
                                 *fverts++ = jvertices.get_array_element(v).get_safe_float_value() * m_scale;
                             }
 
-                            if (attachment->type == Attachment::Type::Mesh)
+                            if (!weighted)
                             {
-                                const auto& meshVerts = static_cast<const MeshAttachment*>(attachment)->vertices;
-                                for (size_t v = 0; v < numVertices; ++v)
+                                float* fverts = reinterpret_cast<float*>(verts.data());
+                                for (size_t v = 0; v < 2*numVertices; ++v)
                                 {
-                                    verts[v] += meshVerts[v];
+                                    fverts[v] += attachment->vertices[v];
                                 }
                             }
 
@@ -1144,12 +1175,8 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
 
                         readCurve(timeline->frames[f], jframe);
                     }
-                    anim.timelines.emplace_back(timeline);
-                    float duration = timeline->frames.back().time;
-                    if (duration > anim.duration)
-                    {
-                        anim.duration = duration;
-                    }
+                    anim.timelines.emplace_back(timeline);                    
+                    anim.duration = std::max(anim.duration, timeline->frames.back().time);
                 }
             }
         }
@@ -1232,13 +1259,10 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
         }
 
         anim.timelines.emplace_back(timeline);
-        float duration = timeline->frames.back().time;
-        if (duration > anim.duration)
-        {
-            anim.duration = duration;
-        }
+        anim.duration = std::max(anim.duration, timeline->frames.back().time);
     }
 
+    /* Event timeline. */
     if (ievents < len)
     {
         const auto& jevents = json.get_object_value(ievents);
@@ -1270,11 +1294,7 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
         }
 
         anim.timelines.emplace_back(timeline);
-        float duration = timeline->frames.back().time;
-        if (duration > anim.duration)
-        {
-            anim.duration = duration;
-        }
+        anim.duration = std::max(anim.duration, timeline->frames.back().time);
     }
 }
 
@@ -1302,6 +1322,64 @@ void SkeletonJson::readCurve(CurveFrame& frame, const sajson::value& json)
         c2.y = jcurve.get_array_element(3).get_safe_float_value();
 
         frame.setCurve(c1, c2);
+    }
+}
+
+void SkeletonJson::readVertices(const sajson::value& json, VertexAttachment& attachment, int verticesLength)
+{
+    attachment.worldVerticesCount = verticesLength / 2;
+
+    auto ivertices = json.find_object_key(sajson::literal("vertices"));
+
+    if (ivertices >= json.get_length()) return;
+
+    const auto& jvertices = json.get_object_value(ivertices);
+    const auto numVertices = jvertices.get_length();
+
+    if (int(numVertices) == verticesLength)
+    {
+        // no bones and weights just plain vertices
+        auto& v = attachment.vertices;
+        v.resize(verticesLength);
+        for (size_t i = 0; i < verticesLength; ++i)
+        {
+            v[i] = jvertices.get_array_element(i).get_safe_float_value() * m_scale;
+        }
+
+        attachment.bones.clear();
+    }
+    else
+    {
+        // format of jvertices is bones, bone, x, y, weight
+
+        size_t numBones = 0;
+        size_t numWeights = 0;
+        for (size_t v = 0; v < numVertices;)
+        {
+            int bc = jvertices.get_array_element(v).get_integer_value();
+            numBones += bc + 1;
+            numWeights += 3 * bc;
+            v += 1 + bc * 4;
+        }
+
+        attachment.bones.resize(numBones);
+        attachment.vertices.resize(numWeights);
+
+        int b = 0;
+        int w = 0;
+        for (size_t v = 0; v < numVertices;)
+        {
+            int bc = jvertices.get_array_element(v++).get_integer_value();
+            attachment.bones[b++] = bc;
+            for (int ib = 0; ib < bc; ++ib)
+            {
+                attachment.bones[b++] = jvertices.get_array_element(v).get_integer_value();
+                attachment.vertices[w++] = jvertices.get_array_element(v + 1).get_safe_float_value() * m_scale;
+                attachment.vertices[w++] = jvertices.get_array_element(v + 2).get_safe_float_value() * m_scale;
+                attachment.vertices[w++] = jvertices.get_array_element(v + 3).get_safe_float_value();
+                v += 4;
+            }
+        }
     }
 }
 

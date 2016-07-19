@@ -31,74 +31,35 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <spinecpp/BoneData.h>
-#include <vector>
+#include <spinecpp/Attachment.h>
+#include <spinecpp/Vector.h>
+#include <shared_vector/shared_vector.hpp>
 
 namespace spine
 {
 
-class Skeleton;
+class Slot;
 
-struct Bone
+class VertexAttachment : public Attachment
 {
 public:
-    static void setYDown(bool yDown);
-    static bool isYDown();
+    void computeWorldVertices(const Slot& slot, float* outWorldVertices) const;
+    void computeWorldVertices(int start, int count, const Slot& slot, float* outWorldVertices, int offset) const;
 
-    Bone(const BoneData& data, const Skeleton& skeleton, Bone* parent);
+    // indices of bones int a skeleton
+    chobo::shared_vector<int> bones;
+    
+    // could be 
+    // pairs: x,y,x,y,x,y....
+    // or 
+    // triplets: x,y,weight,x,y,weight,... if there are bones
+    chobo::shared_vector<float> vertices;
 
-    const std::string& getName() const { return data.name; }
+    // number of vertices (ie number of paris or triplets in vertices)
+    int worldVerticesCount = 0;
 
-    void setToSetupPose();
-    void updateWorldTransform();
-    void updateWorldTransformWith(Vector translation, float rotation, Vector scale, Vector shear);
-
-    float getWorldRotationX() const;
-    float getWorldRotationY() const;
-    float getWorldScaleX() const;
-    float getWorldScaleY() const;
-
-    float worldToLocalRotationX() const;
-    float worldToLocalRotationY() const;
-
-    void rotateWorld(float degrees);
-    void updateLocalTransform();
-
-    void worldToLocal(Vector world, Vector& outLocal);
-    void localToWorld(Vector local, Vector& outWorld);
-
-    bool isRoot() const { return !parent; }
-
-    // links
-    const BoneData& data;
-    const Skeleton& skeleton;
-    Bone* const parent;
-    std::vector<Bone*> children;
-
-    // Logical data
-
-    // user data
-    Vector translation;
-    float rotation;
-    Vector scale;
-    Vector shear;
-
-    float appliedRotation;
-
-    // Physical data
-
-    // world tranform 2x2 matrix
-    float a, b;
-    float c, d;
-
-    Vector worldPos;
-    Vector worldSign;
-
-    // Internal data
-    int/*bool*/ sorted;
-
-private:
-    static bool m_isYDown;
+protected:
+    VertexAttachment(const std::string& name, const Type type);
 };
 
 }

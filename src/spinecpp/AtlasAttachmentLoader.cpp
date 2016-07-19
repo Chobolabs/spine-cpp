@@ -33,7 +33,7 @@
 #include <spinecpp/Atlas.h>
 #include <spinecpp/RegionAttachment.h>
 #include <spinecpp/MeshAttachment.h>
-#include <spinecpp/WeightedMeshAttachment.h>
+#include <spinecpp/PathAttachment.h>
 #include <spinecpp/BoundingBoxAttachment.h>
 
 namespace spine
@@ -96,34 +96,10 @@ Attachment* AtlasAttachmentLoader::createAttachmentImpl(const Skin& skin, Attach
         attachment->regionOriginalHeight = region->originalHeight;
         return attachment;
     }
-    case Attachment::Type::WeightedMesh:
-    case Attachment::Type::WeightedLinkedMesh:
-    {
-        auto region = m_atlas.findRegion(path);
-
-        if (!region)
-        {
-            setError("Region for weighted mesh not found: ", path);
-            return nullptr;
-        }
-
-        auto attachment = new WeightedMeshAttachment(name, path);
-        attachment->rendererObject = region;
-        attachment->regionUV.x = region->u;
-        attachment->regionUV.y = region->v;
-        attachment->regionUV2.x = region->u2;
-        attachment->regionUV2.y = region->v2;
-        attachment->regionRotate = region->rotate;
-        attachment->regionOffsetX = region->offsetX;
-        attachment->regionOffsetY = region->offsetY;
-        attachment->regionWidth = region->width;
-        attachment->regionHeight = region->height;
-        attachment->regionOriginalWidth = region->originalWidth;
-        attachment->regionOriginalHeight = region->originalHeight;
-        return attachment;
-    }
     case Attachment::Type::BoundingBox:
         return new BoundingBoxAttachment(name);
+    case Attachment::Type::Path:
+        return new PathAttachment(name);
     default:
         setUnknownTypeError(type);
         return nullptr;

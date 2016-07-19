@@ -18,7 +18,7 @@ Please read the [migration guide](https://github.com/Chobolabs/spine-cpp/blob/ma
 
 ## Limitations
 
-spine-cpp works with data exported from Spine 3.2.07 (but not linked meshes yet). Support for 3.3 is in progress.
+spine-cpp works with data exported from Spine 3.4.
 
 Like the spine-c runtime binary loading is not yet supported.
 
@@ -31,7 +31,6 @@ No custom allocation options (yet), except for animation state track entries.
 * Written in C++11 with virtual functions instead of spine-c's C-style polymorphism (Unfortunately it also means slower compile-time)
 * Uses a fork of [sajson](https://github.com/chadaustin/sajson) to load json files which provides much faster load time. The time spent in json parsing is about a half of spine-c's.
 * Utilizes more cache-friendly data structures which improve performance of the animation state update and world vertex generation. The observed gain is 2-3% on desktop cpus and 10-40% on common arm cpus found on most hand-held devices (due to their lower L1 and L2 cache miss tolerance)
-* No support for linked meshes yet, but it will be available soon
 
 You can also see the upcoming features in the [roadmap](https://github.com/Chobolabs/spine-cpp/blob/master/Roadmap.md).
 

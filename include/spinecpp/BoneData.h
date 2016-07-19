@@ -39,13 +39,16 @@ namespace spine
 
 struct BoneData
 {
-    BoneData(const std::string& name, const BoneData* parent)
-        : name(name)
+    BoneData(int index, const std::string& name, const BoneData* parent)
+        : index(index)
+        , name(name)
         , parent(parent)
         , translation(0, 0)
         , scale(1, 1)
+        , shear(0, 0)
     {}
 
+    const int index;
     const std::string name;
     const BoneData* const parent;
     float length = 0;
@@ -53,7 +56,7 @@ struct BoneData
     float rotation = 0;
     Vector scale;
     Vector shear;
-    bool inheritScale = true, inheritRotation = true;
+    bool inheritRotation = true, inheritScale = true;
 };
 
 }

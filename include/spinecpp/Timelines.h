@@ -238,13 +238,14 @@ private:
     int* m_drawOrderBuffer;
 };
 
-class FFDTimeline : public CurveTimeline
+class DeformTimeline : public CurveTimeline
 {
 public:
-    FFDTimeline(int framesCount, size_t frameVerticesCount);
-    ~FFDTimeline();
+    DeformTimeline(int framesCount, size_t frameVerticesCount);
+    ~DeformTimeline();
 
     void setFrame(int frameIndex, float time, const std::vector<Vector>& vertices);
+    void setFrame(int frameIndex, float time, const std::vector<float>& vertices);
 
     virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
 
@@ -261,6 +262,8 @@ public:
     const Attachment* attachment = nullptr;
 
 private:
+    void setFrame(int frameIndex, float time, const float* vertexData);
+
     const size_t m_frameVerticesCount;
     Vector* m_verticesBuffer;
 };
@@ -305,6 +308,62 @@ public:
 
     std::vector<Frame> frames;
     int transformConstraintIndex = 0;
+};
+
+class PathConstraintTimeline : public CurveTimeline
+{
+public:
+    PathConstraintTimeline(int framesCount, Timeline::Type type);
+
+    virtual void clearIdentityFrames() override;
+
+    struct Frame : public CurveFrame
+    {
+        float time;
+        float value;
+    };
+
+    std::vector<Frame> frames;
+    int pathConstraintIndex = 0;
+
+protected:
+    void applyToValue(float time, float alpha, float& inOutValue) const;
+};
+
+class PathConstraintPositionTimeline : public PathConstraintTimeline
+{
+public:
+    PathConstraintPositionTimeline(int framesCount);
+
+    virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
+};
+
+class PathConstraintSpacingTimeline : public PathConstraintTimeline
+{
+public:
+    PathConstraintSpacingTimeline(int framesCount);
+
+    virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
+};
+
+class PathConstraintMixTimeline : public CurveTimeline
+{
+public:
+    PathConstraintMixTimeline(int framesCount);
+
+    virtual void apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const override;
+
+    virtual void clearIdentityFrames() override;
+
+    struct Frame : public CurveFrame
+    {
+        float time;
+        float rotateMix;
+        float translateMix;
+    };
+
+    std::vector<Frame> frames;
+    int pathConstraintIndex = 0;
 };
 
 }

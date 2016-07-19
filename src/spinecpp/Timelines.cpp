@@ -37,7 +37,6 @@
 #include <spinecpp/Event.h>
 #include <spinecpp/Attachment.h>
 #include <spinecpp/MeshAttachment.h>
-#include <spinecpp/WeightedMeshAttachment.h>
 
 #include <algorithm>
 #include <cstring>
@@ -55,6 +54,39 @@ typename std::vector<Frame>::const_iterator findFrame(const std::vector<Frame>& 
         return t < f.time;
     });
 }
+
+
+inline void normalizeAngle(float& angle)
+{
+    while (angle > 180)
+        angle -= 360;
+    while (angle < -180)
+        angle += 360;
+}
+
+inline float clamp(float f, float min, float max)
+{
+    if (f < min) return min;
+    if (f > max) return max;
+    return f;
+}
+
+inline float saturate(float f)
+{
+    return clamp(f, 0, 1);
+}
+
+template <typename Frame>
+void initFramesBezeierData(std::vector<Frame>& frames, Vector* bezierBuffer)
+{
+    Vector* ptr = bezierBuffer;
+    for (auto& f : frames)
+    {
+        f.bezierData = ptr;
+        ptr += CurveFrame::BEZIER_DATA_SIZE;
+    }
+}
+
 }
 
 void CurveFrame::setLinear()
@@ -69,12 +101,10 @@ void CurveFrame::setStepped()
 
 void CurveFrame::setCurve(Vector c1, Vector c2)
 {
-    const float subdiv1 = 1.0f / CurveFrame::BEZIER_SEGMENTS, subdiv2 = subdiv1 * subdiv1, subdiv3 = subdiv2 * subdiv1;
-    float pre1 = 3 * subdiv1, pre2 = 3 * subdiv2, pre4 = 6 * subdiv2, pre5 = 6 * subdiv3;
-    float tmp1x = -c1.x * 2 + c2.x, tmp1y = -c1.y * 2 + c2.y, tmp2x = (c1.x - c2.x) * 3 + 1, tmp2y = (c1.y - c2.y) * 3 + 1;
-    float dfx = c1.x * pre1 + tmp1x * pre2 + tmp2x * subdiv3, dfy = c1.y * pre1 + tmp1y * pre2 + tmp2y * subdiv3;
-    float ddfx = tmp1x * pre4 + tmp2x * pre5, ddfy = tmp1y * pre4 + tmp2y * pre5;
-    float dddfx = tmp2x * pre5, dddfy = tmp2y * pre5;
+    float tmpx = (-c1.x * 2 + c2.x) * 0.03f, tmpy = (-c1.y * 2 + c2.y) * 0.03f;
+	float dddfx = ((c1.x - c2.x) * 3 + 1) * 0.006f, dddfy = ((c1.y - c2.y) * 3 + 1) * 0.006f;
+	float ddfx = tmpx * 2 + dddfx, ddfy = tmpy * 2 + dddfy;
+	float dfx = c1.x * 0.3f + tmpx + dddfx * 0.16666667f, dfy = c1.y * 0.3f + tmpy + dddfy * 0.16666667f;
     float x = dfx, y = dfy;
 
     type = CurveFrame::Type::Bezier;
@@ -95,6 +125,7 @@ void CurveFrame::setCurve(Vector c1, Vector c2)
 
 float CurveFrame::getCurvePercent(float percent) const
 {
+    percent = saturate(percent);
     if (type == CurveFrame::Type::Linear) return percent;
     if (type == CurveFrame::Type::Stepped) return 0;
 
@@ -136,42 +167,6 @@ CurveTimeline::~CurveTimeline()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-namespace
-{
-inline void normalizeAngle(float& angle)
-{
-    while (angle > 180)
-        angle -= 360;
-    while (angle < -180)
-        angle += 360;
-}
-
-inline float clamp(float f, float min, float max)
-{
-    if (f < min) return min;
-    if (f > max) return max;
-    return f;
-}
-
-inline float saturate(float f)
-{
-    return clamp(f, 0, 1);
-}
-
-template <typename Frame>
-void initFramesBezeierData(std::vector<Frame>& frames, Vector* bezierBuffer)
-{
-    Vector* ptr = bezierBuffer;
-    for (auto& f : frames)
-    {
-        f.bezierData = ptr;
-        ptr += CurveFrame::BEZIER_DATA_SIZE;
-    }
-}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 RotateTimeline::RotateTimeline(int framesCount)
     : CurveTimeline(framesCount, Timeline::Type::Rotate)
 {
@@ -198,7 +193,7 @@ void RotateTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::
     auto prevFrame = curFrame - 1;
 
     float percent = 1 - (time - curFrame->time) / (prevFrame->time - curFrame->time);
-    percent = prevFrame->getCurvePercent(saturate(percent));
+    percent = prevFrame->getCurvePercent(percent);
 
     float amount = curFrame->angle - prevFrame->angle;
     normalizeAngle(amount);
@@ -247,7 +242,7 @@ void TranslateTimeline::apply(Skeleton& skeleton, float lastTime, float time, st
     auto prevFrame = curFrame - 1;
 
     float percent = 1 - (time - curFrame->time) / (prevFrame->time - curFrame->time);
-    percent = prevFrame->getCurvePercent(saturate(percent));
+    percent = prevFrame->getCurvePercent(percent);
 
     bone.translation +=
         (
@@ -298,7 +293,7 @@ void ScaleTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::v
     auto prevFrame = curFrame - 1;
 
     float percent = 1 - (time - curFrame->time) / (prevFrame->time - curFrame->time);
-    percent = prevFrame->getCurvePercent(saturate(percent));
+    percent = prevFrame->getCurvePercent(percent);
 
     bone.scale +=
         (
@@ -339,7 +334,7 @@ void ShearTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::v
 
     if (time >= frames.back().time) // time is after last frame
     {
-        bone.shear += (bone.data.shear * frames.back().shear - bone.shear) * alpha;
+        bone.shear += (bone.data.shear + frames.back().shear - bone.shear) * alpha;
         return;
     }
 
@@ -348,7 +343,7 @@ void ShearTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::v
     auto prevFrame = curFrame - 1;
 
     float percent = 1 - (time - curFrame->time) / (prevFrame->time - curFrame->time);
-    percent = prevFrame->getCurvePercent(saturate(percent));
+    percent = prevFrame->getCurvePercent(percent);
 
     bone.shear += 
         (bone.data.shear 
@@ -398,7 +393,7 @@ void ColorTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::v
         auto prevFrame = curFrame - 1;
 
         float percent = 1 - (time - curFrame->time) / (prevFrame->time - curFrame->time);
-        percent = prevFrame->getCurvePercent(saturate(percent));
+        percent = prevFrame->getCurvePercent(percent);
 
         color.r = prevFrame->color.r + (curFrame->color.r - prevFrame->color.r) * percent;
         color.g = prevFrame->color.g + (curFrame->color.g - prevFrame->color.g) * percent;
@@ -444,38 +439,17 @@ AttachmentTimeline::AttachmentTimeline()
 
 void AttachmentTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const
 {
-    if (time < frames.front().time)
-    {
-        // time is before first frame
-        if (lastTime > time)
-        {
-            // simulate looping after the last last
-            time = std::numeric_limits<float>::max();
-        }
-        else
-        {
-            return;
-        }
-    }
-    else if (lastTime > time)
-    {
-        // set last time to before firts
-        lastTime = -1;
-    }
+    if (time < frames.front().time) return; // time is before first frame
 
-    const Frame* prevFrame = nullptr;
+    std::vector<Frame>::const_iterator prevFrame;
     if (time >= frames.back().time) // time is after last frame
     {
-        prevFrame = &frames.back();
+        prevFrame = frames.end() - 1;
     }
     else
     {
-        auto iprevFrame = findFrame(frames, time);
-
-        prevFrame = frames.data() + (iprevFrame - frames.begin()) - 1;
+        prevFrame = findFrame(frames, time) - 1;
     }
-
-    if (prevFrame->time < lastTime) return;
 
     const Attachment* attachment = nullptr;
 
@@ -638,8 +612,8 @@ void DrawOrderTimeline::clearIdentityFrames()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-FFDTimeline::FFDTimeline(int framesCount, size_t frameVerticesCount)
-    : CurveTimeline(framesCount, Timeline::Type::FFD)
+DeformTimeline::DeformTimeline(int framesCount, size_t frameVerticesCount)
+    : CurveTimeline(framesCount, Timeline::Type::Deform)
     , m_frameVerticesCount(frameVerticesCount)
 {
     frames.resize(framesCount);
@@ -655,19 +629,29 @@ FFDTimeline::FFDTimeline(int framesCount, size_t frameVerticesCount)
     }
 }
 
-FFDTimeline::~FFDTimeline()
+DeformTimeline::~DeformTimeline()
 {
     delete[] m_verticesBuffer;
 }
 
-void FFDTimeline::setFrame(int frameIndex, float time, const std::vector<Vector>& vertices)
+void DeformTimeline::setFrame(int frameIndex, float time, const std::vector<Vector>& vertices)
+{
+    setFrame(frameIndex, time, reinterpret_cast<const float*>(vertices.data()));
+}
+
+void DeformTimeline::setFrame(int frameIndex, float time, const std::vector<float>& vertices)
+{
+    setFrame(frameIndex, time, vertices.data());
+}
+
+void DeformTimeline::setFrame(int frameIndex, float time, const float* vertexData)
 {
     auto& frame = frames[frameIndex];
     frame.time = time;
-    memcpy(frame.vertices, vertices.data(), sizeof(Vector)*m_frameVerticesCount);
+    memcpy(frame.vertices, vertexData, sizeof(Vector)*m_frameVerticesCount);
 }
 
-void FFDTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const
+void DeformTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const
 {
     if (time < frames.front().time) return; // time is before first frame
 
@@ -681,13 +665,7 @@ void FFDTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vec
         case Attachment::Type::Mesh:
         {
             auto mesh = static_cast<const MeshAttachment*>(slot.getAttachment());
-            if (!mesh->inheritFFD || mesh->getParentMesh() != attachment) return;
-            break;
-        }
-        case Attachment::Type::WeightedMesh:
-        {
-            auto mesh = static_cast<const WeightedMeshAttachment*>(slot.getAttachment());
-            if (!mesh->inheritFFD || mesh->getParentMesh() != attachment) return;
+            if (!mesh->inheritDeform || mesh->getParentMesh() != attachment) return;
             break;
         }
         default:
@@ -731,7 +709,7 @@ void FFDTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vec
     auto prevFrame = curFrame - 1;
 
     float percent = 1 - (time - curFrame->time) / (prevFrame->time - curFrame->time);
-    percent = prevFrame->getCurvePercent(saturate(percent));
+    percent = prevFrame->getCurvePercent(percent);
 
     auto prevVertices = prevFrame->vertices;
     auto curVertices = curFrame->vertices;
@@ -753,7 +731,7 @@ void FFDTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vec
     }
 }
 
-void FFDTimeline::clearIdentityFrames()
+void DeformTimeline::clearIdentityFrames()
 {
     auto verts = frames.front().vertices;
     for (size_t i = 1; i < frames.size(); ++i)
@@ -800,7 +778,7 @@ void IkConstraintTimeline::apply(Skeleton& skeleton, float lastTime, float time,
     auto prevFrame = curFrame - 1;
 
     float percent = 1 - (time - curFrame->time) / (prevFrame->time - curFrame->time);
-    percent = prevFrame->getCurvePercent(saturate(percent));
+    percent = prevFrame->getCurvePercent(percent);
 
     float mix = prevFrame->mix + (curFrame->mix - prevFrame->mix) * percent;
     constraint.mix += (mix - constraint.mix) * alpha;
@@ -846,23 +824,22 @@ void TransformConstraintTimeline::apply(Skeleton& skeleton, float lastTime, floa
         return;
     }
 
-    /* Interpolate between the previous frame and the current frame. */
     // Interpolate between the previous frame and the current frame.
     auto curFrame = findFrame(frames, time);
     auto prevFrame = curFrame - 1;
 
     float percent = 1 - (time - curFrame->time) / (prevFrame->time - curFrame->time);
-    percent = prevFrame->getCurvePercent(saturate(percent));
+    percent = prevFrame->getCurvePercent(percent);
 
-    auto rotate = curFrame->rotateMix;
-    auto translate = curFrame->translateMix;
-    auto scale = curFrame->scaleMix;
-    auto shear = curFrame->shearMix;
+    auto rotate = prevFrame->rotateMix;
+    auto translate = prevFrame->translateMix;
+    auto scale = prevFrame->scaleMix;
+    auto shear = prevFrame->shearMix;
 
-    constraint.rotateMix += (rotate + (prevFrame->rotateMix - rotate) * percent - constraint.rotateMix) * alpha;
-    constraint.translateMix += (translate + (prevFrame->translateMix - translate) * percent - constraint.translateMix) * alpha;
-    constraint.scaleMix += (scale + (prevFrame->scaleMix - scale) * percent - constraint.scaleMix) * alpha;
-    constraint.shearMix += (shear + (prevFrame->shearMix - shear) * percent - constraint.shearMix) * alpha;
+    constraint.rotateMix += (rotate + (curFrame->rotateMix - rotate) * percent - constraint.rotateMix) * alpha;
+    constraint.translateMix += (translate + (curFrame->translateMix - translate) * percent - constraint.translateMix) * alpha;
+    constraint.scaleMix += (scale + (curFrame->scaleMix - scale) * percent - constraint.scaleMix) * alpha;
+    constraint.shearMix += (shear + (curFrame->shearMix - shear) * percent - constraint.shearMix) * alpha;
 }
 
 void TransformConstraintTimeline::clearIdentityFrames()
@@ -897,5 +874,129 @@ void TransformConstraintTimeline::clearIdentityFrames()
 
     frames.erase(frames.begin() + 1, frames.end());
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+PathConstraintTimeline::PathConstraintTimeline(int framesCount, Timeline::Type type)
+    : CurveTimeline(framesCount, type)
+{
+    frames.resize(framesCount);
+    initFramesBezeierData(frames, m_bezierDataBuffer);
+}
+
+void PathConstraintTimeline::clearIdentityFrames()
+{
+    auto val = frames.front().value;
+    for (size_t i = 1; i < frames.size(); ++i)
+    {
+        if (frames[i].value != val)
+        {
+            return;
+        }
+    }
+
+    frames.erase(frames.begin() + 1, frames.end());
+}
+
+void PathConstraintTimeline::applyToValue(float time, float alpha, float& inOutValue) const
+{
+    if (time < frames.front().time) return; // time is before first frame
+
+    if (time >= frames.back().time) // time is after last frame
+    {
+        inOutValue += (frames.back().value - inOutValue) * alpha;
+        return;
+    }
+
+    // Interpolate between the previous frame and the current frame.
+    auto curFrame = findFrame(frames, time);
+    auto prevFrame = curFrame - 1;
+
+    float percent = 1 - (time - curFrame->time) / (prevFrame->time - curFrame->time);
+    percent = prevFrame->getCurvePercent(percent);
+
+    auto value = prevFrame->value;
+    inOutValue += (value + (curFrame->value - value) * percent - inOutValue) * alpha;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+PathConstraintPositionTimeline::PathConstraintPositionTimeline(int framesCount)
+    : PathConstraintTimeline(framesCount, Timeline::Type::PathConstraintPosition)
+{
+}
+
+void PathConstraintPositionTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const
+{
+    auto& constraint = skeleton.pathConstraints[pathConstraintIndex];
+    applyToValue(time, alpha, constraint.position);
+}
+
+PathConstraintSpacingTimeline::PathConstraintSpacingTimeline(int framesCount)
+    : PathConstraintTimeline(framesCount, Timeline::Type::PathConstraintSpacing)
+{
+}
+
+void PathConstraintSpacingTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const
+{
+    auto& constraint = skeleton.pathConstraints[pathConstraintIndex];
+    applyToValue(time, alpha, constraint.spacing);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+PathConstraintMixTimeline::PathConstraintMixTimeline(int framesCount)
+    : CurveTimeline(framesCount, Timeline::Type::PathConstraintMix)
+{
+    frames.resize(framesCount);
+    initFramesBezeierData(frames, m_bezierDataBuffer);
+}
+
+void PathConstraintMixTimeline::apply(Skeleton& skeleton, float lastTime, float time, std::vector<const Event*>* firedEvents, float alpha) const
+{
+    if (time < frames.front().time) return; // time is before first frame
+
+    auto& constraint = skeleton.pathConstraints[pathConstraintIndex];
+
+    if (time >= frames.back().time) // time is after last frame
+    {
+        constraint.rotateMix += (frames.back().rotateMix - constraint.rotateMix) * alpha;
+        constraint.translateMix += (frames.back().translateMix - constraint.translateMix) * alpha;
+        return;
+    }
+
+    // Interpolate between the previous frame and the current frame.
+    auto curFrame = findFrame(frames, time);
+    auto prevFrame = curFrame - 1;
+
+    float percent = 1 - (time - curFrame->time) / (prevFrame->time - curFrame->time);
+    percent = prevFrame->getCurvePercent(percent);
+
+    auto rotateMix = prevFrame->rotateMix;
+    auto translateMix = prevFrame->translateMix;
+    constraint.rotateMix += (rotateMix + (curFrame->rotateMix - rotateMix) * percent - constraint.rotateMix) * alpha;
+    constraint.translateMix += (translateMix + (curFrame->translateMix - translateMix) * percent - constraint.translateMix) * alpha;
+}
+
+void PathConstraintMixTimeline::clearIdentityFrames()
+{
+    auto rotateMix = frames.front().rotateMix;
+    auto translateMix = frames.front().translateMix;
+    for (size_t i = 1; i < frames.size(); ++i)
+    {
+        if (frames[i].rotateMix != rotateMix)
+        {
+            return;
+        }
+
+        if (frames[i].translateMix != translateMix)
+        {
+            return;
+        }
+    }
+
+    frames.erase(frames.begin() + 1, frames.end());
+}
+
 
 }

@@ -52,9 +52,12 @@ public:
         Attachment,
         Event,
         Draworder,
-        FFD,
+        Deform,
         IkConstraint,
-        TransformConstraint
+        TransformConstraint,
+        PathConstraintPosition,
+        PathConstraintSpacing,
+        PathConstraintMix,
     };
 
     Timeline(Type type)

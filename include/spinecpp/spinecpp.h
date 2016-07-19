@@ -42,7 +42,6 @@
 #include <spinecpp/BoneData.h>
 #include <spinecpp/RegionAttachment.h>
 #include <spinecpp/MeshAttachment.h>
-#include <spinecpp/WeightedMeshAttachment.h>
 #include <spinecpp/BoundingBoxAttachment.h>
 #include <spinecpp/Skeleton.h>
 #include <spinecpp/SkeletonBounds.h>

@@ -31,59 +31,21 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <spinecpp/Attachment.h>
-#include <spinecpp/Vector.h>
-#include <spinecpp/Color.h>
-
-#include <vector>
+#include <spinecpp/VertexAttachment.h>
 
 namespace spine
 {
 
-class Slot;
-
-class WeightedMeshAttachment : public Attachment
+class PathAttachment : public VertexAttachment
 {
 public:
-    WeightedMeshAttachment(const std::string& name, const std::string& path);
+    PathAttachment(const std::string& name)
+        : VertexAttachment(name, Attachment::Type::Path)
+    {}
 
-    void updateUVs();
-    void computeWorldVertices(const Slot& slot, float* outWorldVertices) const;
-
-    const std::string path;
-
-    std::vector<int> bones;
-    std::vector<float> weights;
-
-    // Chobo: actually indices
-    std::vector<int> triangles;
-
-    std::vector<Vector> regionUVs;
-    std::vector<Vector> uvs;
-    int hullLength = 0;
-
-    void setParentMesh(const WeightedMeshAttachment* parentMesh);
-    const WeightedMeshAttachment* getParentMesh() const { return m_parentMesh; }
-
-    bool inheritFFD = false;
-
-    Color color = Color(1, 1, 1, 1);
-
-    const void* rendererObject = nullptr;
-
-    int regionOffsetX = 0, regionOffsetY = 0; // Pixels stripped from the bottom left, unrotated.
-    int regionWidth = 0, regionHeight = 0; // Unrotated, stripped pixel size.
-    int regionOriginalWidth = 0, regionOriginalHeight = 0; // Unrotated, unstripped pixel size.
-    Vector regionUV = Vector(0, 0);
-    Vector regionUV2 = Vector(0, 0);
-    bool regionRotate = false;
-
-    // Nonessential.
-    std::vector<int> edges;
-    Vector size = Vector(0, 0);
-
-private:
-    const WeightedMeshAttachment* m_parentMesh = nullptr;
+    std::vector<float> lengths;
+    int/*bool*/ closed = false;
+    int constantSpeed = 0;
 };
 
 }

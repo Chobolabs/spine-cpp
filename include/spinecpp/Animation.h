@@ -51,12 +51,12 @@ public:
 
     /** Poses the skeleton at the specified time for this animation.
       * @param lastTime The last time the animation was applied.
-      * @param events Any triggered events are added. */
+      * @param events Any triggered events are added. May be null. */
     void apply(Skeleton& skeleton, float lastTime, float time, int loop, std::vector<const Event*>* outEvents) const;
 
     /** Poses the skeleton at the specified time for this animation mixed with the current pose.
       * @param lastTime The last time the animation was applied.
-      * @param events Any triggered events are added.
+      * @param events Any triggered events are added. May be null.
       * @param alpha The amount of this animation that affects the current pose. */
     void mix(Skeleton& skeleton, float lastTime, float time, int loop, std::vector<const Event*>* outEvents, float alpha) const;
 

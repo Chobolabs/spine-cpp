@@ -120,4 +120,15 @@ int SkeletonData::findTransformConstraintIndex(const char* constraintName) const
     return findIndexByName(transformConstraints, constraintName);
 }
 
+const PathConstraintData* SkeletonData::findPathConstraint(const char* constraintName) const
+{
+    return findByName(pathConstraints, constraintName);
+}
+
+
+int SkeletonData::findPathConstraintIndex(const char* constraintName) const
+{
+    return findIndexByName(pathConstraints, constraintName);
+}
+
 }

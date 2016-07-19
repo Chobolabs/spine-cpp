@@ -31,7 +31,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <spinecpp/Attachment.h>
+#include <spinecpp/VertexAttachment.h>
 #include <spinecpp/Vector.h>
 #include <spinecpp/Color.h>
 
@@ -42,33 +42,15 @@ namespace spine
 
 class Slot;
 
-class MeshAttachment : public Attachment
+class MeshAttachment : public VertexAttachment
 {
 public:
     MeshAttachment(const std::string& name, const std::string& path);
-
+    
     void updateUVs();
-    void computeWorldVertices(const Slot& slot, float* outWorldVertices) const;
-
-    size_t getVerticesCount() const { return vertices.size(); }
-
-    const std::string path;
-
-    std::vector<Vector> vertices;
-    int hullLength = 0;
-
-    std::vector<Vector> regionUVs;
-    std::vector<Vector> uvs;
-
-    // Chobo: actually indices
-    std::vector<int> triangles;
-
+    
     void setParentMesh(const MeshAttachment* parentMesh);
     const MeshAttachment* getParentMesh() const { return m_parentMesh; }
-
-    bool inheritFFD = false;
-
-    Color color = Color(1, 1, 1, 1);
 
     const void* rendererObject = nullptr;
 
@@ -79,8 +61,22 @@ public:
     Vector regionUV2 = Vector(0, 0);
     bool regionRotate = false;
 
+    const std::string path;    
+
+    chobo::shared_vector<Vector> regionUVs;
+    std::vector<Vector> uvs;
+
+    // Chobo: actually indices
+    chobo::shared_vector<int> triangles;
+
+    Color color = Color(1, 1, 1, 1);
+
+    int hullLength = 0;
+
+    int/*bool*/ inheritDeform = false;
+
     // Nonessential.
-    std::vector<int> edges;
+    chobo::shared_vector<int> edges;
     Vector size = Vector(0, 0);
 
 private:

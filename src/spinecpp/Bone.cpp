@@ -67,7 +67,7 @@ bool Bone::isYDown()
     return m_isYDown;
 }
 
-Bone::Bone(const BoneData& data, const Skeleton& skeleton, const Bone* parent)
+Bone::Bone(const BoneData& data, const Skeleton& skeleton, Bone* parent)
     : data(data)
     , skeleton(skeleton)
     , parent(parent)
@@ -91,7 +91,6 @@ void Bone::updateWorldTransform()
 void Bone::updateWorldTransformWith(Vector translation, float rotation, Vector scale, Vector shear)
 {
     appliedRotation = rotation;
-    appliedScale = scale;
 
     float rotationY = rotation + 90 + shear.y;
     float la = cos_deg(rotation + shear.x) * scale.x, lb = cos_deg(rotationY) * scale.y;
@@ -158,10 +157,10 @@ void Bone::updateWorldTransformWith(Vector translation, float rotation, Vector s
                 float cosine = cos_deg(p->appliedRotation); 
                 float sine = sin_deg(p->appliedRotation);
                 float temp = pa * cosine + pb * sine;
-                pb = pa * -sine + pb * cosine;
+                pb = pb * cosine - pa * sine;
                 pa = temp;
                 temp = pc * cosine + pd * sine;
-                pd = pc * -sine + pd * cosine;
+                pd = pd * cosine - pc * sine;
                 pc = temp;
 
                 if (!p->data.inheritRotation) break;
@@ -184,31 +183,24 @@ void Bone::updateWorldTransformWith(Vector translation, float rotation, Vector s
 
             do {
                 float za, zb, zc, zd;
-                
-                float r = p->appliedRotation;
-                float psx = p->appliedScale.x; 
-                float psy = p->appliedScale.y;
-                float cosine = cos_deg(r); 
-                float sine = sin_deg(r);
-                za = cosine * psx; 
-                zb = -sine * psy; 
-                zc = sine * psx; 
-                zd = cosine * psy;
+
+                float psx = p->scale.x, psy = p->scale.y;
+                float cosine = cos_deg(p->appliedRotation);
+                float sine = sin_deg(p->appliedRotation);
+                za = cosine * psx; zb = sine * psy; zc = sine * psx; zd = cosine * psy;
                 float temp = pa * za + pb * zc;
-                pb = pa * zb + pb * zd;
+                pb = pb * zd - pa * zb;
                 pa = temp;
                 temp = pc * za + pd * zc;
-                pd = pc * zb + pd * zd;
+                pd = pd * zd - pc * zb;
                 pc = temp;
 
-                if (psx < 0) r = -r;
-                cosine = cos_deg(-r);
-                sine = sin_deg(-r);
+                if (psx >= 0) sine = -sine;
                 temp = pa * cosine + pb * sine;
-                pb = pa * -sine + pb * cosine;
+                pb = pb * cosine - pa * sine;
                 pa = temp;
                 temp = pc * cosine + pd * sine;
-                pd = pc * -sine + pd * cosine;
+                pd = pd * cosine - pc * sine;
                 pc = temp;
 
                 if (!p->data.inheritScale) break;
@@ -263,10 +255,85 @@ float Bone::getWorldScaleY() const
     return sqrt(c * c + d * d) * worldSign.y;
 }
 
+float Bone::worldToLocalRotationX() const
+{
+    if (!parent) return rotation;
+    return atan2(parent->a * c - parent->c * a, parent->d * a - parent->b * c) * RAD_DEG;
+}
+
+float Bone::worldToLocalRotationY() const
+{
+    if (!parent) return rotation;
+    return atan2(parent->a * d - parent->c * b, parent->d * b - parent->b * d) * RAD_DEG;
+}
+
+void Bone::rotateWorld(float degrees)
+{
+    float cosine = cos_deg(degrees), sine = sin_deg(degrees);
+
+    float a = this->a, b = this->b, c = this->c, d = this->d;
+
+    this->a = cosine * a - sine * c;
+    this->b = cosine * b - sine * d;
+    this->c = sine * a + cosine * c;
+    this->d = sine * b + cosine * d;
+}
+
+/** Computes the local transform from the world transform. This can be useful to perform processing on the local transform
+* after the world transform has been modified directly (eg, by a constraint).
+* <p>
+* Some redundant information is lost by the world transform, such as -1,-1 scale versus 180 rotation. The computed local
+* transform values may differ from the original values but are functionally the same. */
+void Bone::updateLocalTransform()
+{
+    if (!parent)
+    {
+        float det = a * d - b * c;
+        translation = worldPos;
+        rotation = atan2(c, a) * RAD_DEG;
+        scale.x = sqrt(a * a + c * c);
+        scale.y = sqrt(b * b + d * d);
+        shear.x = 0;
+        shear.y = atan2(a * b + c * d, det) * RAD_DEG;
+    }
+    else {
+        float pa = parent->a, pb = parent->b, pc = parent->c, pd = parent->d;
+        float pid = 1 / (pa * pd - pb * pc);
+        float dx = worldPos.x - parent->worldPos.x, dy = worldPos.y - parent->worldPos.y;
+        float ia = pid * pd;
+        float id = pid * pa;
+        float ib = pid * pb;
+        float ic = pid * pc;
+        float ra = ia * a - ib * c;
+        float rb = ia * b - ib * d;
+        float rc = id * c - ic * a;
+        float rd = id * d - ic * b;
+        translation.x = (dx * pd * pid - dy * pb * pid);
+        translation.y = (dy * pa * pid - dx * pc * pid);
+        shear.x = 0;
+        scale.x = sqrt(ra * ra + rc * rc);
+        if (scale.x > 0.0001f)
+        {
+            float det = ra * rd - rb * rc;
+            scale.y = det / scale.x;
+            shear.y = atan2(ra * rb + rc * rd, det) * RAD_DEG;
+            rotation = atan2(rc, ra) * RAD_DEG;
+        }
+        else
+        {
+            scale.x = 0;
+            scale.y = sqrt(rb * rb + rd * rd);
+            shear.y = 0;
+            rotation = 90 - atan2(rd, rb) * RAD_DEG;
+        }
+        appliedRotation = rotation;
+    }
+}
+
 void Bone::worldToLocal(Vector world, Vector& outLocal)
 {
-    float x = world.x - worldPos.x, y = world.y - worldPos.y;
     float invDet = 1 / (a * d - b * c);
+    float x = world.x - worldPos.x, y = world.y - worldPos.y;
     outLocal.x = (x * d * invDet - y * b * invDet);
     outLocal.y = (y * a * invDet - x * c * invDet);
 }

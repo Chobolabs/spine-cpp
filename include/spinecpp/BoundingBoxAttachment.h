@@ -31,7 +31,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <spinecpp/Attachment.h>
+#include <spinecpp/VertexAttachment.h>
 #include <spinecpp/Vector.h>
 
 #include <vector>
@@ -39,18 +39,14 @@
 namespace spine
 {
 
-struct Bone;
+class Slot;
 
-class BoundingBoxAttachment : public Attachment
+class BoundingBoxAttachment : public VertexAttachment
 {
 public:
-    BoundingBoxAttachment(const std::string& name);
-
-    size_t getVerticesCount() const { return vertices.size(); }
-
-    void computeWorldVertices(const Bone& bone, float* outWorldVertices) const;
-
-    std::vector<Vector> vertices;
+    BoundingBoxAttachment(const std::string& name) : VertexAttachment(name, Attachment::Type::BoundingBox)
+    {
+    }
 };
 
 }

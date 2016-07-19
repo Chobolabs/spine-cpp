@@ -39,7 +39,7 @@ namespace spine
 {
 
 MeshAttachment::MeshAttachment(const std::string& name, const std::string& path)
-    : Attachment(name, Attachment::Type::Mesh)
+    : VertexAttachment(name, Attachment::Type::Mesh)
     , path(path)
 {
 }
@@ -49,7 +49,7 @@ void MeshAttachment::updateUVs()
     auto size = regionUV2 - regionUV;
 
     uvs.clear();
-    uvs.resize(vertices.size());
+    uvs.resize(worldVerticesCount);
 
     if (regionRotate)
     {
@@ -75,31 +75,25 @@ void MeshAttachment::updateUVs()
     }
 }
 
-void MeshAttachment::computeWorldVertices(const Slot& slot, float* worldVertices) const
-{
-    auto& bone = slot.bone;
-    float x = bone.skeleton.translation.x + bone.worldPos.x;
-    float y = bone.skeleton.translation.y + bone.worldPos.y;
-
-    const auto& verts =
-        slot.attachmentVertices.size() == vertices.size()
-        ?
-        slot.attachmentVertices
-        :
-        vertices;
-
-    int i = 0;
-    for (auto& vertex : verts)
-    {
-        worldVertices[i] = vertex.x * bone.a + vertex.y * bone.b + x;
-        worldVertices[i + 1] = vertex.x * bone.c + vertex.y * bone.d + y;
-        i += 2;
-    }
-}
-
 void MeshAttachment::setParentMesh(const MeshAttachment* parentMesh)
 {
-    assert(false);
+    m_parentMesh = parentMesh;
+    if (parentMesh)
+    {
+        worldVerticesCount = parentMesh->worldVerticesCount;
+        
+        bones = parentMesh->bones;
+        vertices = parentMesh->vertices;
+
+        regionUVs = parentMesh->regionUVs;
+        triangles = parentMesh->triangles;
+
+        hullLength = parentMesh->hullLength;
+
+        edges = parentMesh->edges;
+        
+        size = parentMesh->size;
+    }
 }
 
 }

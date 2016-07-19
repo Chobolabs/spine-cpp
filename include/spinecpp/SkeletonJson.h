@@ -42,7 +42,8 @@ class Atlas;
 struct SkeletonData;
 class Animation;
 struct CurveFrame;
-class Attachment;
+class MeshAttachment;
+class VertexAttachment;
 
 namespace sajson
 {
@@ -68,17 +69,18 @@ private:
 
     void readAnimation(Animation& outAnim, const SkeletonData& skeletonData, const sajson::value& json);
     void readCurve(CurveFrame& frame, const sajson::value& json);
+    void readVertices(const sajson::value& json, VertexAttachment& attachment, int verticesLength);
 
     struct LinkedMesh
     {
-        LinkedMesh(Attachment* mesh, const char* skin, int slotIndex, const char* parent)
+        LinkedMesh(MeshAttachment* mesh, const char* skin, int slotIndex, const char* parent)
             : mesh(mesh)
             , skin(skin)
             , slotIndex(slotIndex)
             , parent(parent)
         {}
 
-        Attachment* mesh;
+        MeshAttachment* mesh;
         const char* skin;
         int slotIndex;
         const char* parent;
