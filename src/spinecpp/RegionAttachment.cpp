@@ -79,7 +79,7 @@ void RegionAttachment::updateOffset()
     float localX2 = localX + regionWidth * regionScaleX;
     float localY2 = localY + regionHeight * regionScaleY;
     float radians = rotation * DEG_RAD;
-    float cosine = cos(radians), sine = sin(radians);
+    float cosine = std::cos(radians), sine = std::sin(radians);
     float localXCos = localX * cosine + translation.x;
     float localXSin = localX * sine;
     float localYCos = localY * cosine + translation.y;

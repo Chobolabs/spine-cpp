@@ -163,8 +163,8 @@ void PathConstraint::apply()
 
             if (tip)
             {
-                float cosine = cos(r);
-                float sine = sin(r);
+                float cosine = std::cos(r);
+                float sine = std::sin(r);
                 float length = bone->data.length;
                 bonePos.x += (length * (cosine * a - sine * c) - delta.x) * rotateMix;
                 bonePos.y += (length * (sine * a + cosine * c) - delta.y) * rotateMix;
@@ -177,8 +177,8 @@ void PathConstraint::apply()
 
             r *= rotateMix;
 
-            float cosine = cos(r);
-            float sine = sin(r);
+            float cosine = std::cos(r);
+            float sine = std::sin(r);
 
             bone->a = cosine * a - sine * c;
             bone->b = cosine * b - sine * d;
@@ -192,8 +192,8 @@ void PathConstraint::addBeforePosition(float pos, int o)
 {
     auto delta = world[1] - world[0];
     float r = delta.angle();
-    positions[o].position.x = world[0].x + pos * cos(r);
-    positions[o].position.y = world[0].y + pos * sin(r);
+    positions[o].position.x = world[0].x + pos * std::cos(r);
+    positions[o].position.y = world[0].y + pos * std::sin(r);
     positions[o].data = r;
 }
 
@@ -201,8 +201,8 @@ void PathConstraint::addAfterPosition(float pos, int i, int o)
 {
     auto delta = world[i + 1] - world[i];
     float r = delta.angle();
-    positions[o].position.x = world[i + 1].x + pos * cos(r);
-    positions[o].position.y = world[i + 1].y + pos * sin(r);
+    positions[o].position.x = world[i + 1].x + pos * std::cos(r);
+    positions[o].position.y = world[i + 1].y + pos * std::sin(r);
     positions[o].data = r;
 }
 
@@ -217,7 +217,7 @@ void PathConstraint::addCurvePosition(float p, float x1, float y1, float cx1, fl
     x = x1 * uuu + cx1 * uut3 + cx2 * utt3 + x2 * ttt, y = y1 * uuu + cy1 * uut3 + cy2 * utt3 + y2 * ttt;
     positions[o].position.x = x;
     positions[o].position.y = y;
-    if (tangents) positions[o].data = atan2(y - (y1 * uu + cy1 * ut * 2 + cy2 * tt), x - (x1 * uu + cx1 * ut * 2 + cx2 * tt));
+    if (tangents) positions[o].data = std::atan2(y - (y1 * uu + cy1 * ut * 2 + cy2 * tt), x - (x1 * uu + cx1 * ut * 2 + cx2 * tt));
 }
 
 void PathConstraint::computeWorldPositions()
@@ -265,7 +265,7 @@ void PathConstraint::computeWorldPositions()
 
             if (closed)
             {
-                pos = fmod(pos, pathLength);
+                pos = std::fmod(pos, pathLength);
                 if (pos < 0) pos += pathLength;
                 curve = 0;
             }
@@ -403,7 +403,7 @@ void PathConstraint::computeWorldPositions()
 
         if (closed)
         {
-            p = fmod(p, pathLength);
+            p = std::fmod(p, pathLength);
             if (p < 0) p += pathLength;
             curve = 0;
         }
@@ -456,7 +456,7 @@ void PathConstraint::computeWorldPositions()
             float ddfy = tmpy * 2 + dddfy;
             float dfx = (cx1 - x1) * 0.3f + tmpx + dddfx * 0.16666667f;
             float dfy = (cy1 - y1) * 0.3f + tmpy + dddfy * 0.16666667f;
-            curveLength = sqrt(dfx * dfx + dfy * dfy);
+            curveLength = std::sqrt(dfx * dfx + dfy * dfy);
             segments[0] = curveLength;
             for (ii = 1; ii < 8; ++ii) {
                 dfx += ddfx;
