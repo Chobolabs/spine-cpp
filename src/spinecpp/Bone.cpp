@@ -341,7 +341,7 @@ void Bone::worldToLocal(Vector world, Vector& outLocal)
 void Bone::localToWorld(Vector local, Vector& outWorld)
 {
     outWorld.x = local.x * a + local.y * b + worldPos.x;
-    outWorld.y = local.x * c + local.y * d + worldPos.x;
+    outWorld.y = local.x * c + local.y * d + worldPos.y;
 }
 
 }

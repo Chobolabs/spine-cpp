@@ -331,7 +331,7 @@ SkeletonData* SkeletonJson::readSkeletonData(const std::string& json)
             // other
             transform.offsetRotation = jtransform.get_safe_float_value_of_key(literal("rotation"));
             transform.offsetTranslation.x = jtransform.get_safe_float_value_of_key(literal("x")) * m_scale;
-            transform.offsetTranslation.x = jtransform.get_safe_float_value_of_key(literal("y")) * m_scale;
+            transform.offsetTranslation.y = jtransform.get_safe_float_value_of_key(literal("y")) * m_scale;
             transform.offsetScale.x = jtransform.get_safe_float_value_of_key(literal("scaleX")) * m_scale;
             transform.offsetScale.y = jtransform.get_safe_float_value_of_key(literal("scaleY")) * m_scale;
             transform.offsetShearY = jtransform.get_safe_float_value_of_key(literal("shearY")) * m_scale;
