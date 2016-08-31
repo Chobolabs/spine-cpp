@@ -247,12 +247,12 @@ float Bone::getWorldRotationY() const
 
 float Bone::getWorldScaleX() const
 {
-    return sqrt(a * a + b * b) * worldSign.x;
+    return sqrt(a * a + c * c) * worldSign.x;
 }
 
 float Bone::getWorldScaleY() const
 {
-    return sqrt(c * c + d * d) * worldSign.y;
+    return sqrt(b * b + d * d) * worldSign.y;
 }
 
 float Bone::worldToLocalRotationX() const
