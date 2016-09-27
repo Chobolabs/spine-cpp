@@ -1146,7 +1146,7 @@ void SkeletonJson::readAnimation(Animation& anim, const SkeletonData& skeletonDa
                             }
                             else
                             {
-                                timeline->setFrame(int(f), time, attachment->vertices.vec());
+                                timeline->setFrame(int(f), time, *attachment->vertices.get());
                             }
                         }
                         else

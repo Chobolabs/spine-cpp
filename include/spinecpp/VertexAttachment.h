@@ -33,7 +33,7 @@
 
 #include <spinecpp/Attachment.h>
 #include <spinecpp/Vector.h>
-#include <shared_vector/shared_vector.hpp>
+#include <chobo/vector_ptr.hpp>
 
 namespace spine
 {
@@ -47,19 +47,22 @@ public:
     void computeWorldVertices(int start, int count, const Slot& slot, float* outWorldVertices, int offset) const;
 
     // indices of bones int a skeleton
-    chobo::shared_vector<int> bones;
+    chobo::vector_ptr<int> bones;
     
     // could be 
     // pairs: x,y,x,y,x,y....
     // or 
     // triplets: x,y,weight,x,y,weight,... if there are bones
-    chobo::shared_vector<float> vertices;
+    chobo::vector_ptr<float> vertices;
 
     // number of vertices (ie number of paris or triplets in vertices)
     int worldVerticesCount = 0;
 
 protected:
     VertexAttachment(const std::string& name, const Type type);
+
+    std::vector<int> m_bones;
+    std::vector<float> m_vectices;
 };
 
 }

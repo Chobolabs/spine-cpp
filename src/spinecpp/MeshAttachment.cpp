@@ -42,6 +42,9 @@ MeshAttachment::MeshAttachment(const std::string& name, const std::string& path)
     : VertexAttachment(name, Attachment::Type::Mesh)
     , path(path)
 {
+    regionUVs.reset(&m_regionUVs);
+    triangles.reset(&m_triangles);
+    edges.reset(&m_edges);
 }
 
 void MeshAttachment::updateUVs()

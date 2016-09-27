@@ -41,6 +41,8 @@ namespace spine
 VertexAttachment::VertexAttachment(const std::string& name, const Type type)
     : Attachment(name, type)
 {
+    bones.reset(&m_bones);
+    vertices.reset(&m_vectices);
 }
 
 void VertexAttachment::computeWorldVertices(const Slot& slot, float* outWorldVertices) const

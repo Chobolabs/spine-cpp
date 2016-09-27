@@ -63,11 +63,11 @@ public:
 
     const std::string path;    
 
-    chobo::shared_vector<Vector> regionUVs;
+    chobo::vector_ptr<Vector> regionUVs;
     std::vector<Vector> uvs;
 
     // Chobo: actually indices
-    chobo::shared_vector<int> triangles;
+    chobo::vector_ptr<int> triangles;
 
     Color color = Color(1, 1, 1, 1);
 
@@ -76,11 +76,14 @@ public:
     int/*bool*/ inheritDeform = false;
 
     // Nonessential.
-    chobo::shared_vector<int> edges;
+    chobo::vector_ptr<int> edges;
     Vector size = Vector(0, 0);
 
 private:
     const MeshAttachment* m_parentMesh = nullptr;
+    std::vector<Vector> m_regionUVs;
+    std::vector<int> m_triangles;
+    std::vector<int> m_edges;
 };
 
 }
